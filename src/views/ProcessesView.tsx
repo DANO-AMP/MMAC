@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Cpu,
@@ -18,19 +18,7 @@ import {
 import { ErrorBanner } from "../components/ErrorBanner";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useConfirmation } from "../hooks/useConfirmation";
-
-interface ProcessInfo {
-  pid: number;
-  ppid: number;
-  name: string;
-  cpu_usage: number;
-  memory_mb: number;
-  memory_percent: number;
-  user: string;
-  state: string;
-  threads: number;
-  command: string;
-}
+import { useProcesses, ProcessInfo } from "../store/AppStore";
 
 interface TreeNode extends ProcessInfo {
   children: TreeNode[];
@@ -41,55 +29,27 @@ type SortField = "cpu_usage" | "memory_mb" | "name" | "pid";
 type SortDirection = "asc" | "desc";
 
 function ProcessesView() {
-  const [processes, setProcesses] = useState<ProcessInfo[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { processes, isLoading, error, refresh } = useProcesses();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("cpu_usage");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedProcess, setSelectedProcess] = useState<ProcessInfo | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "tree">("list");
   const [expandedPids, setExpandedPids] = useState<Set<number>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const { confirm, dialogProps } = useConfirmation();
 
-  const fetchProcesses = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result: ProcessInfo[] = await invoke("get_all_processes");
-      setProcesses(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-    setIsLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchProcesses();
-  }, [fetchProcesses]);
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (autoRefresh) {
-      interval = setInterval(fetchProcesses, 3000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoRefresh, fetchProcesses]);
-
   const sendSignal = async (pid: number, signal: string) => {
     try {
+      setActionError(null);
       await invoke("send_process_signal", { pid, signal });
       if (signal === "SIGKILL" || signal === "SIGTERM") {
-        setProcesses((prev) => prev.filter((p) => p.pid !== pid));
         setSelectedProcess(null);
       }
-      fetchProcesses();
+      // Refresh will happen automatically via background refresh
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setActionError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -157,24 +117,28 @@ function ProcessesView() {
     return sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />;
   };
 
-  const filteredAndSorted = processes
-    .filter(
-      (p) =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.command.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.pid.toString().includes(searchQuery)
-    )
-    .sort((a, b) => {
-      const multiplier = sortDirection === "asc" ? 1 : -1;
-      if (sortField === "name") {
-        return multiplier * a.name.localeCompare(b.name);
-      }
-      return multiplier * (a[sortField] - b[sortField]);
-    });
+  const filteredAndSorted = useMemo(() => {
+    return processes
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.command.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.pid.toString().includes(searchQuery)
+      )
+      .sort((a, b) => {
+        const multiplier = sortDirection === "asc" ? 1 : -1;
+        if (sortField === "name") {
+          return multiplier * a.name.localeCompare(b.name);
+        }
+        return multiplier * (a[sortField] - b[sortField]);
+      });
+  }, [processes, searchQuery, sortField, sortDirection]);
 
-  const totalCpu = processes.reduce((sum, p) => sum + p.cpu_usage, 0);
-  const totalMemory = processes.reduce((sum, p) => sum + p.memory_mb, 0);
+  const { totalCpu, totalMemory } = useMemo(() => ({
+    totalCpu: processes.reduce((sum, p) => sum + p.cpu_usage, 0),
+    totalMemory: processes.reduce((sum, p) => sum + p.memory_mb, 0),
+  }), [processes]);
 
   return (
     <div className="p-6">
@@ -187,6 +151,12 @@ function ProcessesView() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isLoading && (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <span>Actualizando...</span>
+            </div>
+          )}
           <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden">
             <button
               onClick={() => setViewMode("list")}
@@ -212,18 +182,7 @@ function ProcessesView() {
             </button>
           </div>
           <button
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-              autoRefresh
-                ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                : "bg-dark-card border border-dark-border text-gray-400 hover:text-white"
-            }`}
-          >
-            <Zap size={16} />
-            <span className="text-sm">Auto</span>
-          </button>
-          <button
-            onClick={fetchProcesses}
+            onClick={refresh}
             disabled={isLoading}
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50"
           >
@@ -233,8 +192,15 @@ function ProcessesView() {
         </div>
       </div>
 
-      {error && (
-        <ErrorBanner error={error} onRetry={fetchProcesses} className="mb-6" />
+      {(error || actionError) && (
+        <ErrorBanner
+          error={error || actionError || ""}
+          onRetry={() => {
+            setActionError(null);
+            refresh();
+          }}
+          className="mb-6"
+        />
       )}
 
       {/* Summary cards */}

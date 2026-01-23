@@ -7,19 +7,8 @@ import {
   Server,
   Trash2,
   FileText,
-  Zap,
 } from "lucide-react";
-
-interface NetworkConnection {
-  protocol: string;
-  local_address: string;
-  local_port: number;
-  remote_address: string;
-  remote_port: number;
-  state: string;
-  pid: number;
-  process_name: string;
-}
+import { useConnections } from "../store/AppStore";
 
 interface HostEntry {
   ip: string;
@@ -30,39 +19,27 @@ interface HostEntry {
 type Tab = "connections" | "hosts" | "dns";
 
 export default function ConnectionsView() {
+  const { connections, isLoading: connectionsLoading, lastUpdated, refresh } = useConnections();
   const [activeTab, setActiveTab] = useState<Tab>("connections");
-  const [connections, setConnections] = useState<NetworkConnection[]>([]);
   const [hosts, setHosts] = useState<HostEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [hostsLoading, setHostsLoading] = useState(false);
+  const [dnsLoading, setDnsLoading] = useState(false);
   const [dnsMessage, setDnsMessage] = useState<string | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-
-  const loadConnections = async () => {
-    setLoading(true);
-    try {
-      const result = await invoke<NetworkConnection[]>("get_active_connections");
-      setConnections(result);
-    } catch (error) {
-      console.error("Error loading connections:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadHosts = async () => {
-    setLoading(true);
+    setHostsLoading(true);
     try {
       const result = await invoke<HostEntry[]>("get_hosts");
       setHosts(result);
     } catch (error) {
       console.error("Error loading hosts:", error);
     } finally {
-      setLoading(false);
+      setHostsLoading(false);
     }
   };
 
   const flushDns = async () => {
-    setLoading(true);
+    setDnsLoading(true);
     try {
       const result = await invoke<string>("flush_dns");
       setDnsMessage(result);
@@ -70,24 +47,15 @@ export default function ConnectionsView() {
     } catch (error) {
       setDnsMessage("Error al vaciar caché DNS");
     } finally {
-      setLoading(false);
+      setDnsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (activeTab === "connections") {
-      loadConnections();
-    } else if (activeTab === "hosts") {
+    if (activeTab === "hosts" && hosts.length === 0) {
       loadHosts();
     }
   }, [activeTab]);
-
-  // Auto-refresh for connections
-  useEffect(() => {
-    if (!autoRefresh || activeTab !== "connections") return;
-    const interval = setInterval(loadConnections, 3000);
-    return () => clearInterval(interval);
-  }, [autoRefresh, activeTab]);
 
   const getStateColor = (state: string) => {
     switch (state) {
@@ -114,6 +82,11 @@ export default function ConnectionsView() {
           </h2>
           <p className="text-gray-400 mt-1">
             Conexiones activas, hosts y DNS
+            {lastUpdated > 0 && activeTab === "connections" && (
+              <span className="ml-2 text-xs">
+                (actualizado: {new Date(lastUpdated).toLocaleTimeString("es-ES")})
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -130,6 +103,7 @@ export default function ConnectionsView() {
         >
           <Globe size={18} />
           Conexiones
+          {connectionsLoading && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />}
         </button>
         <button
           onClick={() => setActiveTab("hosts")}
@@ -158,75 +132,61 @@ export default function ConnectionsView() {
       {/* Connections Tab */}
       {activeTab === "connections" && (
         <div className="space-y-4">
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-400">
+              {connections.length} conexiones activas
+            </div>
             <button
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                autoRefresh
-                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                  : "bg-dark-card border border-dark-border text-gray-400 hover:text-white"
-              }`}
-            >
-              <Zap size={16} />
-              <span className="text-sm">Auto</span>
-            </button>
-            <button
-              onClick={loadConnections}
-              disabled={loading}
+              onClick={refresh}
+              disabled={connectionsLoading}
               className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors"
             >
-              <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={18} className={connectionsLoading ? "animate-spin" : ""} />
               Actualizar
             </button>
           </div>
 
-          {loading && connections.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="animate-spin text-primary-400" size={32} />
-            </div>
-          ) : (
-            <div className="bg-dark-card rounded-xl border border-dark-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-dark-border bg-dark-bg/50">
-                    <th className="text-left px-4 py-3 font-medium">Proceso</th>
-                    <th className="text-left px-4 py-3 font-medium">Protocolo</th>
-                    <th className="text-left px-4 py-3 font-medium">Local</th>
-                    <th className="text-left px-4 py-3 font-medium">Remoto</th>
-                    <th className="text-left px-4 py-3 font-medium">Estado</th>
+          <div className="bg-dark-card rounded-xl border border-dark-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-dark-border bg-dark-bg/50">
+                  <th className="text-left px-4 py-3 font-medium">Proceso</th>
+                  <th className="text-left px-4 py-3 font-medium">Protocolo</th>
+                  <th className="text-left px-4 py-3 font-medium">Local</th>
+                  <th className="text-left px-4 py-3 font-medium">Remoto</th>
+                  <th className="text-left px-4 py-3 font-medium">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dark-border">
+                {connections.slice(0, 100).map((conn, idx) => (
+                  <tr key={idx} className="hover:bg-dark-bg/30">
+                    <td className="px-4 py-2">
+                      <p className="font-medium">
+                        {conn.process_name || `PID ${conn.pid}`}
+                      </p>
+                    </td>
+                    <td className="px-4 py-2 font-mono text-gray-400">
+                      TCP
+                    </td>
+                    <td className="px-4 py-2 font-mono">
+                      {conn.local_address}:{conn.local_port}
+                    </td>
+                    <td className="px-4 py-2 font-mono">
+                      {conn.remote_address}:{conn.remote_port}
+                    </td>
+                    <td className={`px-4 py-2 ${getStateColor(conn.state)}`}>
+                      {conn.state || "-"}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-dark-border">
-                  {connections.slice(0, 100).map((conn, idx) => (
-                    <tr key={idx} className="hover:bg-dark-bg/30">
-                      <td className="px-4 py-2">
-                        <p className="font-medium">
-                          {conn.process_name || `PID ${conn.pid}`}
-                        </p>
-                      </td>
-                      <td className="px-4 py-2 font-mono text-gray-400">
-                        {conn.protocol}
-                      </td>
-                      <td className="px-4 py-2 font-mono">
-                        {conn.local_address}:{conn.local_port}
-                      </td>
-                      <td className="px-4 py-2 font-mono">
-                        {conn.remote_address}:{conn.remote_port}
-                      </td>
-                      <td className={`px-4 py-2 ${getStateColor(conn.state)}`}>
-                        {conn.state || "-"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {connections.length === 0 && (
-                <div className="p-8 text-center text-gray-400">
-                  No se encontraron conexiones activas
-                </div>
-              )}
-            </div>
-          )}
+                ))}
+              </tbody>
+            </table>
+            {connections.length === 0 && (
+              <div className="p-8 text-center text-gray-400">
+                No se encontraron conexiones activas
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -236,10 +196,10 @@ export default function ConnectionsView() {
           <div className="flex justify-end">
             <button
               onClick={loadHosts}
-              disabled={loading}
+              disabled={hostsLoading}
               className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors"
             >
-              <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={18} className={hostsLoading ? "animate-spin" : ""} />
               Actualizar
             </button>
           </div>
@@ -285,10 +245,10 @@ export default function ConnectionsView() {
             </p>
             <button
               onClick={flushDns}
-              disabled={loading}
+              disabled={dnsLoading}
               className="flex items-center gap-2 px-6 py-2.5 bg-primary-500 hover:bg-primary-600 rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              {loading ? (
+              {dnsLoading ? (
                 <RefreshCw className="animate-spin" size={18} />
               ) : (
                 <Trash2 size={18} />

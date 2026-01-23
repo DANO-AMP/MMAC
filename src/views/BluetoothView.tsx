@@ -1,5 +1,3 @@
-import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import {
   Bluetooth,
   BluetoothConnected,
@@ -17,52 +15,10 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { ErrorBanner } from "../components/ErrorBanner";
-
-interface BluetoothDevice {
-  name: string;
-  address: string;
-  device_type: string;
-  battery_percent: number | null;
-  is_connected: boolean;
-  is_paired: boolean;
-  vendor: string | null;
-}
-
-interface BluetoothInfo {
-  enabled: boolean;
-  discoverable: boolean;
-  address: string | null;
-  devices: BluetoothDevice[];
-}
+import { useBluetooth, BluetoothDevice } from "../store/AppStore";
 
 function BluetoothView() {
-  const [bluetoothInfo, setBluetoothInfo] = useState<BluetoothInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadData = async (refresh = false) => {
-    if (refresh) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
-    }
-    setError(null);
-
-    try {
-      const info: BluetoothInfo = await invoke("get_bluetooth_info");
-      setBluetoothInfo(info);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  const { bluetooth, isLoading, error, refresh, lastUpdated } = useBluetooth();
 
   const getDeviceIcon = (type: string) => {
     const iconProps = { size: 24 };
@@ -95,19 +51,8 @@ function BluetoothView() {
     return "text-red-400";
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-6 flex items-center justify-center h-full">
-        <div className="text-center">
-          <RefreshCw size={32} className="animate-spin mx-auto text-primary-400 mb-4" />
-          <p className="text-gray-400">Cargando dispositivos Bluetooth...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const connectedDevices = bluetoothInfo?.devices.filter(d => d.is_connected) || [];
-  const pairedDevices = bluetoothInfo?.devices.filter(d => !d.is_connected && d.is_paired) || [];
+  const connectedDevices = bluetooth?.devices.filter((d: BluetoothDevice) => d.is_connected) || [];
+  const pairedDevices = bluetooth?.devices.filter((d: BluetoothDevice) => !d.is_connected && d.is_paired) || [];
 
   return (
     <div className="p-6">
@@ -117,35 +62,40 @@ function BluetoothView() {
           <h2 className="text-2xl font-bold">Bluetooth</h2>
           <p className="text-gray-400 mt-1">
             Dispositivos conectados y emparejados
+            {lastUpdated > 0 && (
+              <span className="ml-2 text-xs">
+                (actualizado: {new Date(lastUpdated).toLocaleTimeString("es-ES")})
+              </span>
+            )}
           </p>
         </div>
         <button
-          onClick={() => loadData(true)}
-          disabled={isRefreshing}
+          onClick={refresh}
+          disabled={isLoading}
           className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors disabled:opacity-50"
         >
-          <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} />
+          <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
           <span>Actualizar</span>
         </button>
       </div>
 
       {/* Error banner */}
       {error && (
-        <ErrorBanner error={error} onRetry={() => loadData()} className="mb-6" />
+        <ErrorBanner error={error} onRetry={refresh} className="mb-6" />
       )}
 
       {/* Bluetooth status card */}
       <div className={`bg-gradient-to-r ${
-        bluetoothInfo?.enabled
+        bluetooth?.is_powered
           ? "from-blue-600/20 to-blue-800/20 border-blue-500/30"
           : "from-gray-600/20 to-gray-800/20 border-gray-500/30"
       } border rounded-xl p-6 mb-6`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className={`p-3 rounded-xl ${
-              bluetoothInfo?.enabled ? "bg-blue-500/20" : "bg-gray-500/20"
+              bluetooth?.is_powered ? "bg-blue-500/20" : "bg-gray-500/20"
             }`}>
-              {bluetoothInfo?.enabled ? (
+              {bluetooth?.is_powered ? (
                 <BluetoothConnected size={32} className="text-blue-400" />
               ) : (
                 <BluetoothOff size={32} className="text-gray-400" />
@@ -153,14 +103,9 @@ function BluetoothView() {
             </div>
             <div>
               <h3 className="text-xl font-bold">
-                {bluetoothInfo?.enabled ? "Bluetooth Activado" : "Bluetooth Desactivado"}
+                {bluetooth?.is_powered ? "Bluetooth Activado" : "Bluetooth Desactivado"}
               </h3>
-              {bluetoothInfo?.address && (
-                <p className="text-sm text-gray-400">
-                  Direccion: {bluetoothInfo.address}
-                </p>
-              )}
-              {bluetoothInfo?.discoverable && (
+              {bluetooth?.is_discoverable && (
                 <p className="text-sm text-blue-400">Visible para otros dispositivos</p>
               )}
             </div>
@@ -180,7 +125,7 @@ function BluetoothView() {
             Dispositivos Conectados
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {connectedDevices.map((device, index) => (
+            {connectedDevices.map((device: BluetoothDevice, index: number) => (
               <div
                 key={`${device.address}-${index}`}
                 className="bg-dark-card border border-blue-500/30 rounded-xl p-4"
@@ -192,9 +137,6 @@ function BluetoothView() {
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold truncate">{device.name}</h4>
                     <p className="text-sm text-gray-400">{device.device_type}</p>
-                    {device.vendor && (
-                      <p className="text-xs text-gray-500">{device.vendor}</p>
-                    )}
                     {device.address && (
                       <p className="text-xs text-gray-600 font-mono mt-1">{device.address}</p>
                     )}
@@ -222,7 +164,7 @@ function BluetoothView() {
             Dispositivos Emparejados
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pairedDevices.map((device, index) => (
+            {pairedDevices.map((device: BluetoothDevice, index: number) => (
               <div
                 key={`${device.address}-${index}`}
                 className="bg-dark-card border border-dark-border rounded-xl p-4 opacity-70"
@@ -234,9 +176,6 @@ function BluetoothView() {
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold truncate">{device.name}</h4>
                     <p className="text-sm text-gray-400">{device.device_type}</p>
-                    {device.vendor && (
-                      <p className="text-xs text-gray-500">{device.vendor}</p>
-                    )}
                     {device.address && (
                       <p className="text-xs text-gray-600 font-mono mt-1">{device.address}</p>
                     )}
@@ -252,7 +191,7 @@ function BluetoothView() {
       )}
 
       {/* No devices */}
-      {bluetoothInfo?.devices.length === 0 && (
+      {bluetooth?.devices.length === 0 && (
         <div className="bg-dark-card border border-dark-border rounded-xl p-8 text-center">
           <Bluetooth size={48} className="mx-auto text-gray-500 mb-4" />
           <h3 className="text-lg font-medium mb-2">No hay dispositivos</h3>
