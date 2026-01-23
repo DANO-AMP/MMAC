@@ -34,7 +34,6 @@ impl OrphanedService {
         let installed_apps = self.get_installed_apps(&home);
 
         let mut orphaned_files = Vec::new();
-        let mut total_size = 0u64;
 
         // Scan various Library locations
         let scan_paths = vec![
@@ -53,7 +52,7 @@ impl OrphanedService {
         }
 
         // Calculate total size
-        total_size = orphaned_files.iter().map(|f| f.size).sum();
+        let total_size: u64 = orphaned_files.iter().map(|f| f.size).sum();
         let total_count = orphaned_files.len() as u32;
 
         // Sort by size descending
