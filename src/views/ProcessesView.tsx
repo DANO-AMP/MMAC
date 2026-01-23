@@ -40,8 +40,7 @@ function ProcessesView() {
   const [selectedProcess, setSelectedProcess] = useState<ProcessInfo | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
 
-  const { confirmation, showConfirmation, hideConfirmation, handleConfirm } =
-    useConfirmation();
+  const { confirm, dialogProps } = useConfirmation();
 
   const fetchProcesses = useCallback(async () => {
     setIsLoading(true);
@@ -400,16 +399,18 @@ function ProcessesView() {
 
                 <div className="pt-4 space-y-2">
                   <button
-                    onClick={() =>
-                      showConfirmation({
+                    onClick={async () => {
+                      const confirmed = await confirm({
                         title: "Terminar proceso",
                         message: `¿Estás seguro de que quieres terminar "${selectedProcess.name}" (PID: ${selectedProcess.pid})?`,
-                        confirmText: "Terminar",
-                        cancelText: "Cancelar",
-                        variant: "danger",
-                        onConfirm: () => killProcess(selectedProcess.pid, false),
-                      })
-                    }
+                        confirmLabel: "Terminar",
+                        cancelLabel: "Cancelar",
+                        variant: "warning",
+                      });
+                      if (confirmed) {
+                        killProcess(selectedProcess.pid, false);
+                      }
+                    }}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30 rounded-lg transition-colors"
                   >
                     <Square size={16} />
@@ -417,16 +418,18 @@ function ProcessesView() {
                   </button>
 
                   <button
-                    onClick={() =>
-                      showConfirmation({
+                    onClick={async () => {
+                      const confirmed = await confirm({
                         title: "Forzar cierre",
                         message: `¿Estás seguro de que quieres FORZAR el cierre de "${selectedProcess.name}"? Esto puede causar pérdida de datos.`,
-                        confirmText: "Forzar Cierre",
-                        cancelText: "Cancelar",
+                        confirmLabel: "Forzar Cierre",
+                        cancelLabel: "Cancelar",
                         variant: "danger",
-                        onConfirm: () => killProcess(selectedProcess.pid, true),
-                      })
-                    }
+                      });
+                      if (confirmed) {
+                        killProcess(selectedProcess.pid, true);
+                      }
+                    }}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg transition-colors"
                   >
                     <Zap size={16} />
@@ -439,16 +442,7 @@ function ProcessesView() {
         )}
       </div>
 
-      <ConfirmDialog
-        isOpen={confirmation.isOpen}
-        title={confirmation.title}
-        message={confirmation.message}
-        confirmText={confirmation.confirmText}
-        cancelText={confirmation.cancelText}
-        variant={confirmation.variant}
-        onConfirm={handleConfirm}
-        onCancel={hideConfirmation}
-      />
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }
