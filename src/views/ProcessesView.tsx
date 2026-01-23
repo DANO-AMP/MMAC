@@ -10,6 +10,10 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  List,
+  GitBranch,
+  Pause,
+  Play,
 } from "lucide-react";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -17,6 +21,7 @@ import { useConfirmation } from "../hooks/useConfirmation";
 
 interface ProcessInfo {
   pid: number;
+  ppid: number;
   name: string;
   cpu_usage: number;
   memory_mb: number;
@@ -25,6 +30,11 @@ interface ProcessInfo {
   state: string;
   threads: number;
   command: string;
+}
+
+interface TreeNode extends ProcessInfo {
+  children: TreeNode[];
+  depth: number;
 }
 
 type SortField = "cpu_usage" | "memory_mb" | "name" | "pid";
@@ -39,6 +49,8 @@ function ProcessesView() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedProcess, setSelectedProcess] = useState<ProcessInfo | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "tree">("list");
+  const [expandedPids, setExpandedPids] = useState<Set<number>>(new Set());
 
   const { confirm, dialogProps } = useConfirmation();
 
@@ -68,14 +80,67 @@ function ProcessesView() {
     };
   }, [autoRefresh, fetchProcesses]);
 
-  const killProcess = async (pid: number, force: boolean = false) => {
+  const sendSignal = async (pid: number, signal: string) => {
     try {
-      await invoke("kill_process_by_pid", { pid, force });
-      setProcesses((prev) => prev.filter((p) => p.pid !== pid));
-      setSelectedProcess(null);
+      await invoke("send_process_signal", { pid, signal });
+      if (signal === "SIGKILL" || signal === "SIGTERM") {
+        setProcesses((prev) => prev.filter((p) => p.pid !== pid));
+        setSelectedProcess(null);
+      }
+      fetchProcesses();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  };
+
+  const buildProcessTree = (procs: ProcessInfo[]): TreeNode[] => {
+    const nodeMap = new Map<number, TreeNode>();
+    const roots: TreeNode[] = [];
+
+    // Create nodes
+    for (const proc of procs) {
+      nodeMap.set(proc.pid, { ...proc, children: [], depth: 0 });
+    }
+
+    // Build tree
+    for (const proc of procs) {
+      const node = nodeMap.get(proc.pid)!;
+      const parent = nodeMap.get(proc.ppid);
+      if (parent) {
+        node.depth = parent.depth + 1;
+        parent.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+
+    return roots;
+  };
+
+  const flattenTree = (nodes: TreeNode[]): TreeNode[] => {
+    const result: TreeNode[] = [];
+    const traverse = (node: TreeNode) => {
+      result.push(node);
+      if (expandedPids.has(node.pid)) {
+        for (const child of node.children) {
+          traverse(child);
+        }
+      }
+    };
+    for (const root of nodes) {
+      traverse(root);
+    }
+    return result;
+  };
+
+  const toggleExpand = (pid: number) => {
+    const newExpanded = new Set(expandedPids);
+    if (newExpanded.has(pid)) {
+      newExpanded.delete(pid);
+    } else {
+      newExpanded.add(pid);
+    }
+    setExpandedPids(newExpanded);
   };
 
   const handleSort = (field: SortField) => {
@@ -122,6 +187,30 @@ function ProcessesView() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`flex items-center gap-1 px-3 py-2 transition-colors ${
+                viewMode === "list"
+                  ? "bg-primary-500/20 text-primary-400"
+                  : "text-gray-400 hover:text-white"
+              }`}
+              title="Vista de lista"
+            >
+              <List size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode("tree")}
+              className={`flex items-center gap-1 px-3 py-2 transition-colors ${
+                viewMode === "tree"
+                  ? "bg-primary-500/20 text-primary-400"
+                  : "text-gray-400 hover:text-white"
+              }`}
+              title="Vista de arbol"
+            >
+              <GitBranch size={16} />
+            </button>
+          </div>
           <button
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
@@ -268,60 +357,88 @@ function ProcessesView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAndSorted.map((proc) => (
-                    <tr
-                      key={proc.pid}
-                      onClick={() => setSelectedProcess(proc)}
-                      className={`border-b border-dark-border/50 cursor-pointer transition-colors ${
-                        selectedProcess?.pid === proc.pid
-                          ? "bg-primary-500/10"
-                          : "hover:bg-dark-border/30"
-                      }`}
-                    >
-                      <td className="px-4 py-2 text-gray-400 font-mono text-sm">
-                        {proc.pid}
-                      </td>
-                      <td className="px-4 py-2">
-                        <span className="font-medium">{proc.name}</span>
-                      </td>
-                      <td className="px-4 py-2 text-gray-400 text-sm">
-                        {proc.user}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <span
-                          className={`font-mono text-sm ${
-                            proc.cpu_usage > 50
-                              ? "text-red-400"
-                              : proc.cpu_usage > 20
-                              ? "text-yellow-400"
-                              : "text-gray-400"
-                          }`}
-                        >
-                          {proc.cpu_usage.toFixed(1)}%
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <span className="font-mono text-sm text-gray-400">
-                          {proc.memory_mb >= 1024
-                            ? `${(proc.memory_mb / 1024).toFixed(1)} GB`
-                            : `${proc.memory_mb.toFixed(0)} MB`}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            proc.state === "Ejecutando"
-                              ? "bg-green-500/20 text-green-400"
-                              : proc.state === "Suspendido"
-                              ? "bg-yellow-500/20 text-yellow-400"
-                              : "bg-gray-500/20 text-gray-400"
-                          }`}
-                        >
-                          {proc.state}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {(viewMode === "tree"
+                    ? flattenTree(buildProcessTree(filteredAndSorted))
+                    : filteredAndSorted
+                  ).map((proc) => {
+                    const treeProc = proc as TreeNode;
+                    const hasChildren = viewMode === "tree" && treeProc.children?.length > 0;
+                    const depth = viewMode === "tree" ? (treeProc.depth || 0) : 0;
+
+                    return (
+                      <tr
+                        key={proc.pid}
+                        onClick={() => setSelectedProcess(proc)}
+                        className={`border-b border-dark-border/50 cursor-pointer transition-colors ${
+                          selectedProcess?.pid === proc.pid
+                            ? "bg-primary-500/10"
+                            : "hover:bg-dark-border/30"
+                        }`}
+                      >
+                        <td className="px-4 py-2 text-gray-400 font-mono text-sm">
+                          {proc.pid}
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center">
+                            {viewMode === "tree" && (
+                              <span style={{ width: `${depth * 16}px` }} className="flex-shrink-0" />
+                            )}
+                            {viewMode === "tree" && hasChildren && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExpand(proc.pid);
+                                }}
+                                className="w-4 h-4 flex items-center justify-center text-gray-500 hover:text-white mr-1"
+                              >
+                                {expandedPids.has(proc.pid) ? "−" : "+"}
+                              </button>
+                            )}
+                            {viewMode === "tree" && !hasChildren && depth > 0 && (
+                              <span className="w-4 mr-1" />
+                            )}
+                            <span className="font-medium">{proc.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-gray-400 text-sm">
+                          {proc.user}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <span
+                            className={`font-mono text-sm ${
+                              proc.cpu_usage > 50
+                                ? "text-red-400"
+                                : proc.cpu_usage > 20
+                                ? "text-yellow-400"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            {proc.cpu_usage.toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <span className="font-mono text-sm text-gray-400">
+                            {proc.memory_mb >= 1024
+                              ? `${(proc.memory_mb / 1024).toFixed(1)} GB`
+                              : `${proc.memory_mb.toFixed(0)} MB`}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              proc.state === "Ejecutando"
+                                ? "bg-green-500/20 text-green-400"
+                                : proc.state === "Suspendido"
+                                ? "bg-yellow-500/20 text-yellow-400"
+                                : "bg-gray-500/20 text-gray-400"
+                            }`}
+                          >
+                            {proc.state}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -398,43 +515,55 @@ function ProcessesView() {
                 )}
 
                 <div className="pt-4 space-y-2">
-                  <button
-                    onClick={async () => {
-                      const confirmed = await confirm({
-                        title: "Terminar proceso",
-                        message: `¿Estás seguro de que quieres terminar "${selectedProcess.name}" (PID: ${selectedProcess.pid})?`,
-                        confirmLabel: "Terminar",
-                        cancelLabel: "Cancelar",
-                        variant: "warning",
-                      });
-                      if (confirmed) {
-                        killProcess(selectedProcess.pid, false);
-                      }
-                    }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30 rounded-lg transition-colors"
-                  >
-                    <Square size={16} />
-                    <span>Terminar (SIGTERM)</span>
-                  </button>
-
-                  <button
-                    onClick={async () => {
-                      const confirmed = await confirm({
-                        title: "Forzar cierre",
-                        message: `¿Estás seguro de que quieres FORZAR el cierre de "${selectedProcess.name}"? Esto puede causar pérdida de datos.`,
-                        confirmLabel: "Forzar Cierre",
-                        cancelLabel: "Cancelar",
-                        variant: "danger",
-                      });
-                      if (confirmed) {
-                        killProcess(selectedProcess.pid, true);
-                      }
-                    }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg transition-colors"
-                  >
-                    <Zap size={16} />
-                    <span>Forzar Cierre (SIGKILL)</span>
-                  </button>
+                  <p className="text-xs text-gray-500 mb-2">Enviar senal:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={async () => {
+                        const confirmed = await confirm({
+                          title: "Terminar proceso",
+                          message: `¿Terminar "${selectedProcess.name}" (PID: ${selectedProcess.pid})?`,
+                          confirmLabel: "Terminar",
+                          cancelLabel: "Cancelar",
+                          variant: "warning",
+                        });
+                        if (confirmed) sendSignal(selectedProcess.pid, "SIGTERM");
+                      }}
+                      className="flex items-center justify-center gap-1 px-3 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30 rounded-lg transition-colors text-sm"
+                    >
+                      <Square size={14} />
+                      <span>TERM</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const confirmed = await confirm({
+                          title: "Forzar cierre",
+                          message: `¿FORZAR cierre de "${selectedProcess.name}"? Puede causar perdida de datos.`,
+                          confirmLabel: "Forzar",
+                          cancelLabel: "Cancelar",
+                          variant: "danger",
+                        });
+                        if (confirmed) sendSignal(selectedProcess.pid, "SIGKILL");
+                      }}
+                      className="flex items-center justify-center gap-1 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg transition-colors text-sm"
+                    >
+                      <Zap size={14} />
+                      <span>KILL</span>
+                    </button>
+                    <button
+                      onClick={() => sendSignal(selectedProcess.pid, "SIGSTOP")}
+                      className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 rounded-lg transition-colors text-sm"
+                    >
+                      <Pause size={14} />
+                      <span>STOP</span>
+                    </button>
+                    <button
+                      onClick={() => sendSignal(selectedProcess.pid, "SIGCONT")}
+                      className="flex items-center justify-center gap-1 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 rounded-lg transition-colors text-sm"
+                    >
+                      <Play size={14} />
+                      <span>CONT</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

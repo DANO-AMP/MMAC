@@ -4,6 +4,7 @@ use std::process::Command;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProcessInfo {
     pub pid: u32,
+    pub ppid: u32,  // Parent PID
     pub name: String,
     pub cpu_usage: f32,
     pub memory_mb: f32,
@@ -22,14 +23,14 @@ impl ProcessService {
     }
 
     pub fn get_all_processes(&self) -> Vec<ProcessInfo> {
-        // Use ps to get all processes with CPU, memory, user, state, threads
-        // Format: pid, %cpu, rss, %mem, user, state, threads, comm
+        // Use ps to get all processes with CPU, memory, user, state, threads, ppid
+        // Format: pid, ppid, %cpu, rss, %mem, user, state, threads, comm
         // Use LC_ALL=C to ensure decimal points (not commas) in numbers
         let output = Command::new("ps")
             .env("LC_ALL", "C")
             .args([
                 "-axo",
-                "pid,%cpu,rss,%mem,user,state,wq,comm",
+                "pid,ppid,%cpu,rss,%mem,user,state,wq,comm",
                 "-r", // Sort by CPU usage descending
             ])
             .output();
@@ -58,20 +59,21 @@ impl ProcessService {
 
     fn parse_ps_line(&self, line: &str) -> Option<ProcessInfo> {
         let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 8 {
+        if parts.len() < 9 {
             return None;
         }
 
         let pid: u32 = parts[0].parse().ok()?;
-        let cpu_usage: f32 = parts[1].parse().unwrap_or(0.0);
-        let rss_kb: f32 = parts[2].parse().unwrap_or(0.0);
-        let memory_percent: f32 = parts[3].parse().unwrap_or(0.0);
-        let user = parts[4].to_string();
-        let state = self.parse_state(parts[5]);
-        let threads: u32 = parts[6].parse().unwrap_or(1);
+        let ppid: u32 = parts[1].parse().unwrap_or(0);
+        let cpu_usage: f32 = parts[2].parse().unwrap_or(0.0);
+        let rss_kb: f32 = parts[3].parse().unwrap_or(0.0);
+        let memory_percent: f32 = parts[4].parse().unwrap_or(0.0);
+        let user = parts[5].to_string();
+        let state = self.parse_state(parts[6]);
+        let threads: u32 = parts[7].parse().unwrap_or(1);
 
         // The command can have spaces or be a path, join remaining parts
-        let full_command = parts[7..].join(" ");
+        let full_command = parts[8..].join(" ");
 
         // Extract just the process name (basename) from the path
         let name = full_command
@@ -82,6 +84,7 @@ impl ProcessService {
 
         Some(ProcessInfo {
             pid,
+            ppid,
             name,
             cpu_usage,
             memory_mb: rss_kb / 1024.0,
@@ -120,18 +123,31 @@ impl ProcessService {
     }
 
     pub fn kill_process(&self, pid: u32, force: bool) -> Result<(), String> {
+        let signal = if force { "SIGKILL" } else { "SIGTERM" };
+        self.send_signal(pid, signal)
+    }
+
+    pub fn send_signal(&self, pid: u32, signal: &str) -> Result<(), String> {
         // Protect system-critical processes
         if pid < 100 {
             return Err(format!(
-                "No se puede terminar el proceso {}: es un proceso del sistema",
+                "No se puede enviar senal al proceso {}: es un proceso del sistema",
                 pid
             ));
         }
 
-        let signal = if force { "-9" } else { "-15" };
+        let signal_flag = match signal.to_uppercase().as_str() {
+            "SIGTERM" | "TERM" | "15" => "-15",
+            "SIGKILL" | "KILL" | "9" => "-9",
+            "SIGSTOP" | "STOP" | "17" => "-STOP",
+            "SIGCONT" | "CONT" | "19" => "-CONT",
+            "SIGHUP" | "HUP" | "1" => "-1",
+            "SIGINT" | "INT" | "2" => "-2",
+            _ => return Err(format!("Senal desconocida: {}", signal)),
+        };
 
         let output = Command::new("kill")
-            .args([signal, &pid.to_string()])
+            .args([signal_flag, &pid.to_string()])
             .output()
             .map_err(|e| e.to_string())?;
 
@@ -139,7 +155,7 @@ impl ProcessService {
             Ok(())
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(format!("Error al terminar proceso: {}", stderr))
+            Err(format!("Error al enviar senal: {}", stderr))
         }
     }
 }
@@ -160,12 +176,14 @@ mod tests {
     #[test]
     fn test_parse_ps_line() {
         let service = ProcessService::new();
-        let line = "  1234  5.2 102400  2.5 user     S    4 process_name";
+        // Format: pid, ppid, %cpu, rss, %mem, user, state, threads, comm
+        let line = "  1234     1  5.2 102400  2.5 user     S    4 process_name";
         let result = service.parse_ps_line(line);
 
         assert!(result.is_some());
         let proc = result.unwrap();
         assert_eq!(proc.pid, 1234);
+        assert_eq!(proc.ppid, 1);
         assert!((proc.cpu_usage - 5.2).abs() < 0.01);
         assert_eq!(proc.memory_mb, 100.0); // 102400 KB = 100 MB
         assert_eq!(proc.user, "user");
@@ -176,12 +194,13 @@ mod tests {
     #[test]
     fn test_parse_ps_line_with_path() {
         let service = ProcessService::new();
-        let line = "  5678  10.5 204800  1.0 root     R    2 /usr/bin/some_process";
+        let line = "  5678     1  10.5 204800  1.0 root     R    2 /usr/bin/some_process";
         let result = service.parse_ps_line(line);
 
         assert!(result.is_some());
         let proc = result.unwrap();
         assert_eq!(proc.pid, 5678);
+        assert_eq!(proc.ppid, 1);
         assert_eq!(proc.name, "some_process"); // Should extract basename
         assert_eq!(proc.command, "/usr/bin/some_process");
     }
@@ -189,7 +208,7 @@ mod tests {
     #[test]
     fn test_kill_protected_pid() {
         let service = ProcessService::new();
-        let result = service.kill_process(1, false);
+        let result = service.send_signal(1, "SIGTERM");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("proceso del sistema"));
     }

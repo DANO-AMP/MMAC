@@ -13,6 +13,11 @@ import {
   Battery,
   Network,
   Cpu,
+  Beer,
+  Bluetooth,
+  FileQuestion,
+  Settings2,
+  Shield,
 } from "lucide-react";
 import CleaningView from "./views/CleaningView";
 import UninstallerView from "./views/UninstallerView";
@@ -27,6 +32,11 @@ import LargeFilesView from "./views/LargeFilesView";
 import BatteryView from "./views/BatteryView";
 import ConnectionsView from "./views/ConnectionsView";
 import ProcessesView from "./views/ProcessesView";
+import HomebrewView from "./views/HomebrewView";
+import BluetoothView from "./views/BluetoothView";
+import OrphanedView from "./views/OrphanedView";
+import ServicesView from "./views/ServicesView";
+import FirewallView from "./views/FirewallView";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { APP_VERSION } from "./constants/app";
 
@@ -43,7 +53,12 @@ type View =
   | "largefiles"
   | "battery"
   | "connections"
-  | "processes";
+  | "processes"
+  | "homebrew"
+  | "bluetooth"
+  | "orphaned"
+  | "services"
+  | "firewall";
 
 interface NavItem {
   id: View;
@@ -66,6 +81,8 @@ const navSections: NavSection[] = [
       { id: "monitor", label: "Monitor", icon: <Activity size={18} /> },
       { id: "processes", label: "Procesos", icon: <Cpu size={18} /> },
       { id: "battery", label: "Batería", icon: <Battery size={18} /> },
+      { id: "bluetooth", label: "Bluetooth", icon: <Bluetooth size={18} /> },
+      { id: "services", label: "Servicios", icon: <Settings2 size={18} /> },
     ],
   },
   {
@@ -75,6 +92,13 @@ const navSections: NavSection[] = [
       { id: "largefiles", label: "Grandes", icon: <FileBox size={18} /> },
       { id: "duplicates", label: "Duplicados", icon: <Copy size={18} /> },
       { id: "projects", label: "Proyectos", icon: <FolderOpen size={18} /> },
+      { id: "orphaned", label: "Huerfanos", icon: <FileQuestion size={18} /> },
+    ],
+  },
+  {
+    title: "Paquetes",
+    items: [
+      { id: "homebrew", label: "Homebrew", icon: <Beer size={18} /> },
     ],
   },
   {
@@ -82,6 +106,7 @@ const navSections: NavSection[] = [
     items: [
       { id: "ports", label: "Puertos", icon: <Globe size={18} /> },
       { id: "connections", label: "Conexiones", icon: <Network size={18} /> },
+      { id: "firewall", label: "Firewall", icon: <Shield size={18} /> },
     ],
   },
 ];
@@ -117,6 +142,16 @@ function App() {
         return <ConnectionsView />;
       case "processes":
         return <ProcessesView />;
+      case "homebrew":
+        return <HomebrewView />;
+      case "bluetooth":
+        return <BluetoothView />;
+      case "orphaned":
+        return <OrphanedView />;
+      case "services":
+        return <ServicesView />;
+      case "firewall":
+        return <FirewallView />;
       default:
         return <CleaningView />;
     }

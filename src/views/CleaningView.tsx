@@ -9,6 +9,9 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
+  Bug,
+  Hammer,
+  Package,
 } from "lucide-react";
 import { formatSize } from "../utils";
 import { ErrorBanner } from "../components/ErrorBanner";
@@ -66,6 +69,33 @@ function CleaningView() {
       size: 0,
       items: 0,
       selected: true,
+      scanning: false,
+    },
+    {
+      id: "crash_reports",
+      name: "Crash Reports",
+      icon: <Bug size={24} />,
+      size: 0,
+      items: 0,
+      selected: false,
+      scanning: false,
+    },
+    {
+      id: "xcode",
+      name: "Datos de Xcode",
+      icon: <Hammer size={24} />,
+      size: 0,
+      items: 0,
+      selected: false,
+      scanning: false,
+    },
+    {
+      id: "packages",
+      name: "Caches de Paquetes",
+      icon: <Package size={24} />,
+      size: 0,
+      items: 0,
+      selected: false,
       scanning: false,
     },
   ]);
@@ -227,7 +257,7 @@ function CleaningView() {
       </div>
 
       {/* Categories grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {categories.map((category) => (
           <div
             key={category.id}

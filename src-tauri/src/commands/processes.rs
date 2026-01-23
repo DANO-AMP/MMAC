@@ -12,3 +12,9 @@ pub fn kill_process_by_pid(pid: u32, force: bool) -> Result<(), String> {
     let service = ProcessService::new();
     service.kill_process(pid, force)
 }
+
+#[command]
+pub fn send_process_signal(pid: u32, signal: String) -> Result<(), String> {
+    let service = ProcessService::new();
+    service.send_signal(pid, &signal)
+}

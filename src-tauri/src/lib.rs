@@ -2,8 +2,9 @@ mod commands;
 mod services;
 
 use commands::{
-    analyzer::*, battery::*, cleaning::*, duplicates::*, largefiles::*, memory::*, monitor::*,
-    network::*, ports::*, processes::*, projects::*, startup::*, uninstaller::*,
+    analyzer::*, battery::*, bluetooth::*, cleaning::*, daemons::*, duplicates::*, firewall::*,
+    homebrew::*, largefiles::*, memory::*, monitor::*, network::*, orphaned::*, ports::*,
+    processes::*, projects::*, startup::*, uninstaller::*,
 };
 use commands::ports::ScannedPidsState;
 use services::monitor::MonitorService;
@@ -56,6 +57,29 @@ pub fn run() {
             // Processes
             get_all_processes,
             kill_process_by_pid,
+            send_process_signal,
+            // Homebrew
+            get_homebrew_info,
+            list_brew_packages,
+            get_outdated_packages,
+            upgrade_brew_package,
+            upgrade_all_packages,
+            uninstall_brew_package,
+            brew_cleanup,
+            // Bluetooth
+            get_bluetooth_info,
+            // Orphaned Files
+            scan_orphaned_files,
+            delete_orphaned_file,
+            // Launch Services/Daemons
+            list_launch_services,
+            start_launch_service,
+            stop_launch_service,
+            get_launch_service_info,
+            // Firewall
+            get_outgoing_connections,
+            get_firewall_status,
+            resolve_hostname,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

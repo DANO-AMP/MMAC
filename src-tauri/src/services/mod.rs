@@ -1,11 +1,16 @@
 pub mod analyzer;
 pub mod battery;
+pub mod bluetooth;
 pub mod cleaner;
+pub mod daemons;
 pub mod duplicates;
+pub mod firewall;
+pub mod homebrew;
 pub mod largefiles;
 pub mod memory;
 pub mod monitor;
 pub mod network;
+pub mod orphaned;
 pub mod processes;
 pub mod projects;
 pub mod scanner;

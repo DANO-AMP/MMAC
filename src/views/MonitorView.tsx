@@ -7,6 +7,10 @@ import {
   Wifi,
   Thermometer,
   Activity,
+  Fan,
+  ArrowDown,
+  ArrowUp,
+  Monitor,
 } from "lucide-react";
 import {
   LineChart,
@@ -28,6 +32,11 @@ interface SystemStats {
   network_rx: number;
   network_tx: number;
   cpu_temp: number;
+  fan_speed: number | null;
+  disk_read_speed: number;
+  disk_write_speed: number;
+  gpu_name: string | null;
+  gpu_vendor: string | null;
 }
 
 interface ChartData {
@@ -48,6 +57,11 @@ function MonitorView() {
     network_rx: 0,
     network_tx: 0,
     cpu_temp: 0,
+    fan_speed: null,
+    disk_read_speed: 0,
+    disk_write_speed: 0,
+    gpu_name: null,
+    gpu_vendor: null,
   });
 
   const [chartData, setChartData] = useState<ChartData[]>([]);
@@ -323,6 +337,72 @@ function MonitorView() {
           </div>
         </div>
       </div>
+
+      {/* Fan and Disk I/O stats */}
+      <div className="mt-4 grid grid-cols-2 gap-4">
+        {/* Fan Speed */}
+        <div className="bg-dark-card border border-dark-border rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Fan size={18} className="text-cyan-400" />
+            <h3 className="font-semibold">Ventilador</h3>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-3xl font-bold">
+                {stats.fan_speed !== null ? `${stats.fan_speed}` : "--"}
+              </p>
+              <p className="text-sm text-gray-400">RPM</p>
+            </div>
+            {stats.fan_speed !== null && (
+              <div className="text-right text-sm text-gray-400">
+                {stats.fan_speed < 2000 ? "Bajo" : stats.fan_speed < 4000 ? "Normal" : "Alto"}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Disk I/O */}
+        <div className="bg-dark-card border border-dark-border rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <HardDrive size={18} className="text-orange-400" />
+            <h3 className="font-semibold">Disco I/O</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-2">
+              <ArrowDown size={16} className="text-green-400" />
+              <div>
+                <p className="text-lg font-bold">{formatSpeed(stats.disk_read_speed)}</p>
+                <p className="text-xs text-gray-400">Lectura</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <ArrowUp size={16} className="text-blue-400" />
+              <div>
+                <p className="text-lg font-bold">{formatSpeed(stats.disk_write_speed)}</p>
+                <p className="text-xs text-gray-400">Escritura</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* GPU Info */}
+      {stats.gpu_name && (
+        <div className="mt-4 bg-dark-card border border-dark-border rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Monitor size={18} className="text-pink-400" />
+            <h3 className="font-semibold">GPU</h3>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xl font-bold">{stats.gpu_name}</p>
+              {stats.gpu_vendor && (
+                <p className="text-sm text-gray-400">{stats.gpu_vendor}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
