@@ -1,8 +1,7 @@
 use crate::services::monitor::{MonitorService, SystemStats};
-use tauri::command;
+use tauri::{command, State};
 
 #[command]
-pub fn get_system_stats() -> Result<SystemStats, String> {
-    let service = MonitorService::new();
-    Ok(service.get_stats())
+pub fn get_system_stats(monitor: State<'_, MonitorService>) -> Result<SystemStats, String> {
+    Ok(monitor.get_stats())
 }

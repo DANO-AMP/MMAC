@@ -4,6 +4,7 @@ mod services;
 use commands::{
     analyzer::*, cleaning::*, monitor::*, ports::*, projects::*, uninstaller::*,
 };
+use services::monitor::MonitorService;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -11,6 +12,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .manage(MonitorService::new())
         .invoke_handler(tauri::generate_handler![
             // Cleaning
             scan_system,
