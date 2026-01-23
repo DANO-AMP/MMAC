@@ -22,6 +22,8 @@ interface PortInfo {
   local_address: string;
   working_dir?: string;
   command?: string;
+  cpu_usage: number;
+  memory_mb: number;
 }
 
 const serviceIcons: Record<string, React.ReactNode> = {
@@ -223,6 +225,12 @@ function PortScannerView() {
                   <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
                     PID
                   </th>
+                  <th className="text-right px-4 py-3 text-sm font-medium text-gray-400">
+                    CPU
+                  </th>
+                  <th className="text-right px-4 py-3 text-sm font-medium text-gray-400">
+                    RAM
+                  </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
                     Estado
                   </th>
@@ -263,6 +271,18 @@ function PortScannerView() {
                       <td className="px-4 py-3 text-gray-400 font-mono">
                         {port.pid}
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={`font-mono text-sm ${port.cpu_usage > 50 ? 'text-red-400' : port.cpu_usage > 20 ? 'text-yellow-400' : 'text-gray-400'}`}>
+                          {port.cpu_usage.toFixed(1)}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="font-mono text-sm text-gray-400">
+                          {port.memory_mb >= 1024
+                            ? `${(port.memory_mb / 1024).toFixed(1)} GB`
+                            : `${port.memory_mb.toFixed(0)} MB`}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="status-dot status-active" />
@@ -302,6 +322,23 @@ function PortScannerView() {
                   <p className="text-sm text-gray-400">Proceso</p>
                   <p className="font-medium">{selectedPort.process_name}</p>
                   <p className="text-sm text-gray-500">PID: {selectedPort.pid}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-dark-bg p-3 rounded-lg">
+                    <p className="text-xs text-gray-400">CPU</p>
+                    <p className={`text-lg font-bold ${selectedPort.cpu_usage > 50 ? 'text-red-400' : selectedPort.cpu_usage > 20 ? 'text-yellow-400' : 'text-green-400'}`}>
+                      {selectedPort.cpu_usage.toFixed(1)}%
+                    </p>
+                  </div>
+                  <div className="bg-dark-bg p-3 rounded-lg">
+                    <p className="text-xs text-gray-400">RAM</p>
+                    <p className="text-lg font-bold text-blue-400">
+                      {selectedPort.memory_mb >= 1024
+                        ? `${(selectedPort.memory_mb / 1024).toFixed(1)} GB`
+                        : `${selectedPort.memory_mb.toFixed(0)} MB`}
+                    </p>
+                  </div>
                 </div>
 
                 <div>

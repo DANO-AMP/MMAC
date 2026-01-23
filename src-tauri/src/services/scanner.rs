@@ -12,6 +12,8 @@ pub struct PortInfo {
     pub local_address: String,
     pub working_dir: Option<String>,
     pub command: Option<String>,
+    pub cpu_usage: f32,
+    pub memory_mb: f32,
 }
 
 pub struct PortScannerService;
@@ -51,9 +53,11 @@ impl PortScannerService {
 
         // Enrich with process info
         for port in &mut listening_ports {
-            if let Some((cmd, cwd)) = self.get_process_info(port.pid) {
+            if let Some((cmd, cwd, cpu, mem)) = self.get_process_info(port.pid) {
                 port.command = Some(cmd);
                 port.working_dir = cwd;
+                port.cpu_usage = cpu;
+                port.memory_mb = mem;
             }
             port.service_type = self.detect_service_type(port.port, &port.process_name);
         }
@@ -127,19 +131,35 @@ impl PortScannerService {
             local_address: addr,
             working_dir: None,
             command: None,
+            cpu_usage: 0.0,
+            memory_mb: 0.0,
         })
     }
 
-    fn get_process_info(&self, pid: u32) -> Option<(String, Option<String>)> {
-        // Get command line
+    fn get_process_info(&self, pid: u32) -> Option<(String, Option<String>, f32, f32)> {
+        // Get command line, CPU and memory usage
         let cmd_output = Command::new("ps")
-            .args(["-p", &pid.to_string(), "-o", "command="])
+            .args(["-p", &pid.to_string(), "-o", "command=,%cpu=,rss="])
             .output()
             .ok()?;
 
-        let cmd = String::from_utf8_lossy(&cmd_output.stdout)
-            .trim()
-            .to_string();
+        let output = String::from_utf8_lossy(&cmd_output.stdout);
+        let output = output.trim();
+
+        // Parse the output - format is: "command %cpu rss"
+        // RSS is in KB, we convert to MB
+        let parts: Vec<&str> = output.rsplitn(3, char::is_whitespace).collect();
+
+        let (cmd, cpu, mem_kb) = if parts.len() >= 3 {
+            let rss: f32 = parts[0].trim().parse().unwrap_or(0.0);
+            let cpu: f32 = parts[1].trim().parse().unwrap_or(0.0);
+            let cmd = parts[2].trim().to_string();
+            (cmd, cpu, rss)
+        } else {
+            (output.to_string(), 0.0, 0.0)
+        };
+
+        let memory_mb = mem_kb / 1024.0;
 
         // Get working directory
         let cwd_output = Command::new("lsof")
@@ -153,7 +173,7 @@ impl PortScannerService {
             .find(|l| l.starts_with('n') && l.contains('/'))
             .map(|l| l[1..].to_string());
 
-        Some((cmd, cwd))
+        Some((cmd, cwd, cpu, memory_mb))
     }
 
     fn detect_service_type(&self, port: u16, process_name: &str) -> String {
