@@ -69,8 +69,14 @@ function App() {
     <div className="flex h-screen bg-dark-bg text-dark-text">
       {/* Sidebar */}
       <aside className="w-56 bg-dark-card border-r border-dark-border flex flex-col">
+        {/* Drag region for window */}
+        <div
+          className="h-8 flex-shrink-0"
+          data-tauri-drag-region
+        />
+
         {/* Logo */}
-        <div className="p-4 border-b border-dark-border">
+        <div className="px-4 pb-4 border-b border-dark-border">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
               <Sparkles className="text-white" size={24} />
@@ -120,7 +126,14 @@ function App() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">{renderView()}</main>
+      <main className="flex-1 overflow-auto flex flex-col">
+        {/* Drag region for window */}
+        <div
+          className="h-8 flex-shrink-0 w-full"
+          data-tauri-drag-region
+        />
+        <div className="flex-1 overflow-auto">{renderView()}</div>
+      </main>
     </div>
   );
 }
