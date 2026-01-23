@@ -30,13 +30,15 @@ impl PortScannerService {
         let mut ports_map: HashMap<(u16, u32), PortInfo> = HashMap::new();
 
         for line in stdout.lines().skip(1) {
+            // Only process LISTEN entries (actual servers)
+            if !line.contains("LISTEN") {
+                continue;
+            }
+
             if let Some(port_info) = self.parse_lsof_line(line) {
-                // Only keep LISTEN entries or unique port/pid combinations
-                if line.contains("LISTEN") || line.contains("ESTABLISHED") {
-                    let key = (port_info.port, port_info.pid);
-                    if !ports_map.contains_key(&key) {
-                        ports_map.insert(key, port_info);
-                    }
+                let key = (port_info.port, port_info.pid);
+                if !ports_map.contains_key(&key) {
+                    ports_map.insert(key, port_info);
                 }
             }
         }
@@ -71,42 +73,61 @@ impl PortScannerService {
         let process_name = parts[0].to_string();
         let pid: u32 = parts[1].parse().ok()?;
 
-        // Find the NAME column (last part usually contains address:port)
+        // Find the NAME column (last or second-to-last part)
         let name_part = parts.last()?;
 
-        // Parse address:port
-        if let Some((addr, port_str)) = name_part.rsplit_once(':') {
-            // Handle cases like "*:3000" or "127.0.0.1:3000"
-            let port: u16 = port_str.parse().ok()?;
-            let local_address = if addr == "*" {
-                "0.0.0.0".to_string()
-            } else {
-                addr.to_string()
-            };
+        // Skip if it's a state like (LISTEN) or (ESTABLISHED)
+        let addr_part = if name_part.starts_with('(') {
+            // The address is in the second-to-last position
+            parts.get(parts.len() - 2)?
+        } else {
+            name_part
+        };
 
-            // Determine protocol from the line
-            let protocol = if line.contains("TCP") {
-                "TCP"
-            } else if line.contains("UDP") {
-                "UDP"
-            } else {
-                "TCP"
-            }
-            .to_string();
+        // For connections like "192.168.2.40:54850->104.199.65.9:80", take the local part
+        let local_part = if addr_part.contains("->") {
+            addr_part.split("->").next()?
+        } else {
+            addr_part
+        };
 
-            return Some(PortInfo {
-                port,
-                pid,
-                process_name,
-                service_type: String::new(), // Will be filled later
-                protocol,
-                local_address,
-                working_dir: None,
-                command: None,
-            });
+        // Parse address:port - handle IPv6 with brackets like [::1]:8080
+        let (addr, port_str) = if local_part.contains('[') {
+            // IPv6 format: [::1]:8080
+            let bracket_end = local_part.rfind(']')?;
+            let addr = &local_part[1..bracket_end];
+            let port = &local_part[bracket_end + 2..]; // Skip ]:
+            (addr.to_string(), port)
+        } else {
+            // IPv4 or * format: 127.0.0.1:8080 or *:8080
+            let colon_pos = local_part.rfind(':')?;
+            let addr = &local_part[..colon_pos];
+            let port = &local_part[colon_pos + 1..];
+            (if addr == "*" { "0.0.0.0".to_string() } else { addr.to_string() }, port)
+        };
+
+        let port: u16 = port_str.parse().ok()?;
+
+        // Determine protocol from the line
+        let protocol = if line.contains("TCP") {
+            "TCP"
+        } else if line.contains("UDP") {
+            "UDP"
+        } else {
+            "TCP"
         }
+        .to_string();
 
-        None
+        Some(PortInfo {
+            port,
+            pid,
+            process_name,
+            service_type: String::new(), // Will be filled later
+            protocol,
+            local_address: addr,
+            working_dir: None,
+            command: None,
+        })
     }
 
     fn get_process_info(&self, pid: u32) -> Option<(String, Option<String>)> {
