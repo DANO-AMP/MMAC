@@ -52,10 +52,30 @@ export default function ConnectionsView() {
   };
 
   useEffect(() => {
-    if (activeTab === "hosts" && hosts.length === 0) {
-      loadHosts();
-    }
-  }, [activeTab]);
+    let isMounted = true;
+
+    const loadHostsData = async () => {
+      if (!isMounted) return;
+      if (activeTab === "hosts" && hosts.length === 0) {
+        setHostsLoading(true);
+        try {
+          const result = await invoke<HostEntry[]>("get_hosts");
+          if (isMounted) {
+            setHosts(result);
+          }
+        } catch (error) {
+          console.error("Error loading hosts:", error);
+        } finally {
+          if (isMounted) {
+            setHostsLoading(false);
+          }
+        }
+      }
+    };
+
+    loadHostsData();
+    return () => { isMounted = false; };
+  }, [activeTab, hosts.length]);
 
   const getStateColor = (state: string) => {
     switch (state) {
@@ -92,7 +112,7 @@ export default function ConnectionsView() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-dark-border pb-4">
+      <div className="flex gap-2 border-b border-dark-border pb-4" role="tablist" aria-label="Secciones de red">
         <button
           onClick={() => setActiveTab("connections")}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
@@ -100,10 +120,14 @@ export default function ConnectionsView() {
               ? "bg-primary-500/20 text-primary-400"
               : "hover:bg-dark-card"
           }`}
+          role="tab"
+          aria-selected={activeTab === "connections"}
+          aria-controls="connections-panel"
+          id="connections-tab"
         >
-          <Globe size={18} />
+          <Globe size={18} aria-hidden="true" />
           Conexiones
-          {connectionsLoading && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />}
+          {connectionsLoading && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" aria-hidden="true" />}
         </button>
         <button
           onClick={() => setActiveTab("hosts")}
@@ -112,8 +136,12 @@ export default function ConnectionsView() {
               ? "bg-primary-500/20 text-primary-400"
               : "hover:bg-dark-card"
           }`}
+          role="tab"
+          aria-selected={activeTab === "hosts"}
+          aria-controls="hosts-panel"
+          id="hosts-tab"
         >
-          <Server size={18} />
+          <Server size={18} aria-hidden="true" />
           Hosts
         </button>
         <button
@@ -123,43 +151,48 @@ export default function ConnectionsView() {
               ? "bg-primary-500/20 text-primary-400"
               : "hover:bg-dark-card"
           }`}
+          role="tab"
+          aria-selected={activeTab === "dns"}
+          aria-controls="dns-panel"
+          id="dns-tab"
         >
-          <FileText size={18} />
+          <FileText size={18} aria-hidden="true" />
           DNS
         </button>
       </div>
 
       {/* Connections Tab */}
       {activeTab === "connections" && (
-        <div className="space-y-4">
+        <div className="space-y-4" role="tabpanel" id="connections-panel" aria-labelledby="connections-tab">
           <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-gray-400" aria-live="polite">
               {connections.length} conexiones activas
             </div>
             <button
               onClick={refresh}
               disabled={connectionsLoading}
               className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors"
+              aria-label="Actualizar conexiones"
             >
-              <RefreshCw size={18} className={connectionsLoading ? "animate-spin" : ""} />
+              <RefreshCw size={18} className={connectionsLoading ? "animate-spin" : ""} aria-hidden="true" />
               Actualizar
             </button>
           </div>
 
           <div className="bg-dark-card rounded-xl border border-dark-border overflow-hidden">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm" role="table" aria-label="Conexiones de red activas">
               <thead>
                 <tr className="border-b border-dark-border bg-dark-bg/50">
-                  <th className="text-left px-4 py-3 font-medium">Proceso</th>
-                  <th className="text-left px-4 py-3 font-medium">Protocolo</th>
-                  <th className="text-left px-4 py-3 font-medium">Local</th>
-                  <th className="text-left px-4 py-3 font-medium">Remoto</th>
-                  <th className="text-left px-4 py-3 font-medium">Estado</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium">Proceso</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium">Protocolo</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium">Local</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium">Remoto</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-border">
                 {connections.slice(0, 100).map((conn, idx) => (
-                  <tr key={idx} className="hover:bg-dark-bg/30">
+                  <tr key={`${conn.pid}-${conn.local_address}-${conn.local_port}-${conn.remote_address}-${conn.remote_port}-${idx}`} className="hover:bg-dark-bg/30">
                     <td className="px-4 py-2">
                       <p className="font-medium">
                         {conn.process_name || `PID ${conn.pid}`}
@@ -192,30 +225,31 @@ export default function ConnectionsView() {
 
       {/* Hosts Tab */}
       {activeTab === "hosts" && (
-        <div className="space-y-4">
+        <div className="space-y-4" role="tabpanel" id="hosts-panel" aria-labelledby="hosts-tab">
           <div className="flex justify-end">
             <button
               onClick={loadHosts}
               disabled={hostsLoading}
               className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors"
+              aria-label="Actualizar lista de hosts"
             >
-              <RefreshCw size={18} className={hostsLoading ? "animate-spin" : ""} />
+              <RefreshCw size={18} className={hostsLoading ? "animate-spin" : ""} aria-hidden="true" />
               Actualizar
             </button>
           </div>
 
           <div className="bg-dark-card rounded-xl border border-dark-border overflow-hidden">
-            <table className="w-full">
+            <table className="w-full" role="table" aria-label="Entradas de hosts">
               <thead>
                 <tr className="border-b border-dark-border bg-dark-bg/50">
-                  <th className="text-left px-4 py-3 font-medium">IP</th>
-                  <th className="text-left px-4 py-3 font-medium">Hostname</th>
-                  <th className="text-left px-4 py-3 font-medium">Comentario</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium">IP</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium">Hostname</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium">Comentario</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-border">
-                {hosts.map((host, idx) => (
-                  <tr key={idx} className="hover:bg-dark-bg/30">
+                {hosts.map((host) => (
+                  <tr key={`${host.ip}-${host.hostname}`} className="hover:bg-dark-bg/30">
                     <td className="px-4 py-3 font-mono">{host.ip}</td>
                     <td className="px-4 py-3">{host.hostname}</td>
                     <td className="px-4 py-3 text-gray-400">
@@ -236,7 +270,7 @@ export default function ConnectionsView() {
 
       {/* DNS Tab */}
       {activeTab === "dns" && (
-        <div className="space-y-4">
+        <div className="space-y-4" role="tabpanel" id="dns-panel" aria-labelledby="dns-tab">
           <div className="bg-dark-card rounded-xl border border-dark-border p-6">
             <h3 className="font-semibold mb-2">Caché DNS</h3>
             <p className="text-gray-400 mb-4">
@@ -247,17 +281,18 @@ export default function ConnectionsView() {
               onClick={flushDns}
               disabled={dnsLoading}
               className="flex items-center gap-2 px-6 py-2.5 bg-primary-500 hover:bg-primary-600 rounded-lg font-medium transition-colors disabled:opacity-50"
+              aria-label="Vaciar cache DNS del sistema"
             >
               {dnsLoading ? (
-                <RefreshCw className="animate-spin" size={18} />
+                <RefreshCw className="animate-spin" size={18} aria-hidden="true" />
               ) : (
-                <Trash2 size={18} />
+                <Trash2 size={18} aria-hidden="true" />
               )}
               Vaciar Caché DNS
             </button>
 
             {dnsMessage && (
-              <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400">
+              <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400" role="status" aria-live="polite">
                 {dnsMessage}
               </div>
             )}

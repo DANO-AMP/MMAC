@@ -89,10 +89,11 @@ export default function LargeFilesView() {
       <div className="bg-dark-card rounded-xl border border-dark-border p-4 space-y-4">
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-2">
+            <label htmlFor="large-files-path" className="block text-sm text-gray-400 mb-2">
               Carpeta a analizar
             </label>
             <input
+              id="large-files-path"
               type="text"
               value={path}
               onChange={(e) => setPath(e.target.value)}
@@ -101,10 +102,11 @@ export default function LargeFilesView() {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-2">
-              Tamaño mínimo (MB)
+            <label htmlFor="large-files-min-size" className="block text-sm text-gray-400 mb-2">
+              Tamano minimo (MB)
             </label>
             <input
+              id="large-files-min-size"
               type="number"
               value={minSize}
               onChange={(e) => setMinSize(Number(e.target.value))}
@@ -113,10 +115,11 @@ export default function LargeFilesView() {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-2">
-              Límite de resultados
+            <label htmlFor="large-files-limit" className="block text-sm text-gray-400 mb-2">
+              Limite de resultados
             </label>
             <input
+              id="large-files-limit"
               type="number"
               value={limit}
               onChange={(e) => setLimit(Number(e.target.value))}
@@ -130,15 +133,16 @@ export default function LargeFilesView() {
           onClick={startScan}
           disabled={scanning}
           className="flex items-center gap-2 px-6 py-2.5 bg-primary-500 hover:bg-primary-600 rounded-lg font-medium transition-colors disabled:opacity-50"
+          aria-label="Buscar archivos grandes en el disco"
         >
           {scanning ? (
             <>
-              <RefreshCw className="animate-spin" size={18} />
+              <RefreshCw className="animate-spin" size={18} aria-hidden="true" />
               Escaneando...
             </>
           ) : (
             <>
-              <Search size={18} />
+              <Search size={18} aria-hidden="true" />
               Buscar Archivos Grandes
             </>
           )}
@@ -160,17 +164,17 @@ export default function LargeFilesView() {
 
           {/* File list */}
           <div className="bg-dark-card rounded-xl border border-dark-border overflow-hidden">
-            <table className="w-full">
+            <table className="w-full" role="table" aria-label="Lista de archivos grandes">
               <thead>
                 <tr className="border-b border-dark-border bg-dark-bg/50">
-                  <th className="text-left px-4 py-3 font-medium">Nombre</th>
-                  <th className="text-right px-4 py-3 font-medium w-32">
-                    Tamaño
+                  <th scope="col" className="text-left px-4 py-3 font-medium">Nombre</th>
+                  <th scope="col" className="text-right px-4 py-3 font-medium w-32">
+                    Tamano
                   </th>
-                  <th className="text-right px-4 py-3 font-medium w-32">
+                  <th scope="col" className="text-right px-4 py-3 font-medium w-32">
                     Modificado
                   </th>
-                  <th className="w-24"></th>
+                  <th scope="col" className="w-24"><span className="sr-only">Acciones</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-border">
@@ -193,16 +197,16 @@ export default function LargeFilesView() {
                         <button
                           onClick={() => revealInFinder(file.path)}
                           className="p-2 hover:bg-dark-border rounded-lg transition-colors"
-                          title="Mostrar en Finder"
+                          aria-label={`Mostrar ${file.name} en Finder`}
                         >
-                          <FolderOpen size={16} />
+                          <FolderOpen size={16} aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => deleteFile(file.path)}
                           className="p-2 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
-                          title="Mover a Papelera"
+                          aria-label={`Mover ${file.name} a Papelera`}
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={16} aria-hidden="true" />
                         </button>
                       </div>
                     </td>

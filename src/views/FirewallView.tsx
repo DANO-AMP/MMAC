@@ -70,10 +70,55 @@ function FirewallView() {
   };
 
   useEffect(() => {
-    loadData();
+    let isMounted = true;
+
+    const loadInitialData = async () => {
+      if (!isMounted) return;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [conns, status] = await Promise.all([
+          invoke<ProcessConnections[]>("get_outgoing_connections"),
+          invoke<FirewallStatus>("get_firewall_status"),
+        ]);
+        if (isMounted) {
+          setConnections(conns);
+          setFirewallStatus(status);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadInitialData();
+
     // Auto-refresh every 5 seconds
-    const interval = setInterval(() => loadData(true), 5000);
-    return () => clearInterval(interval);
+    const interval = setInterval(async () => {
+      if (!isMounted) return;
+      try {
+        const [conns, status] = await Promise.all([
+          invoke<ProcessConnections[]>("get_outgoing_connections"),
+          invoke<FirewallStatus>("get_firewall_status"),
+        ]);
+        if (isMounted) {
+          setConnections(conns);
+          setFirewallStatus(status);
+        }
+      } catch (err) {
+        // Silent refresh errors
+      }
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const toggleExpand = (key: string) => {
@@ -154,8 +199,9 @@ function FirewallView() {
           onClick={() => loadData(true)}
           disabled={isRefreshing}
           className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors disabled:opacity-50"
+          aria-label="Actualizar conexiones de red"
         >
-          <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} />
+          <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} aria-hidden="true" />
           <span>Actualizar</span>
         </button>
       </div>
@@ -170,16 +216,16 @@ function FirewallView() {
         firewallStatus?.enabled
           ? "from-green-600/20 to-green-800/20 border-green-500/30"
           : "from-red-600/20 to-red-800/20 border-red-500/30"
-      } border rounded-xl p-6 mb-6`}>
+      } border rounded-xl p-6 mb-6`} role="region" aria-label="Estado del firewall" aria-live="polite">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className={`p-3 rounded-xl ${
               firewallStatus?.enabled ? "bg-green-500/20" : "bg-red-500/20"
             }`}>
               {firewallStatus?.enabled ? (
-                <ShieldCheck size={32} className="text-green-400" />
+                <ShieldCheck size={32} className="text-green-400" aria-hidden="true" />
               ) : (
-                <ShieldOff size={32} className="text-red-400" />
+                <ShieldOff size={32} className="text-red-400" aria-hidden="true" />
               )}
             </div>
             <div>
@@ -254,16 +300,17 @@ function FirewallView() {
       {/* Search and filter */}
       <div className="flex gap-4 mb-4">
         <div className="flex-1 relative">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" aria-hidden="true" />
           <input
             type="text"
             placeholder="Buscar por proceso o host..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-dark-card border border-dark-border rounded-lg focus:outline-none focus:border-primary-500"
+            aria-label="Buscar por proceso o host remoto"
           />
         </div>
-        <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden">
+        <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden" role="group" aria-label="Filtrar conexiones por estado">
           {[
             { id: "all", label: "Todas" },
             { id: "established", label: "Establecidas" },
@@ -277,6 +324,7 @@ function FirewallView() {
                   ? "bg-primary-500/20 text-primary-400"
                   : "text-gray-400 hover:text-white hover:bg-dark-border"
               }`}
+              aria-pressed={filter === f.id}
             >
               {f.label}
             </button>
@@ -302,8 +350,13 @@ function FirewallView() {
                   <div
                     className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-dark-border/30 transition-colors"
                     onClick={() => toggleExpand(key)}
+                    onKeyDown={(e) => e.key === "Enter" && toggleExpand(key)}
+                    tabIndex={0}
+                    role="button"
+                    aria-expanded={isExpanded}
+                    aria-label={`${proc.process_name}, ${proc.connection_count} conexiones. ${isExpanded ? "Contraer" : "Expandir"}`}
                   >
-                    <div className="text-gray-400">
+                    <div className="text-gray-400" aria-hidden="true">
                       {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                     </div>
                     <div className="flex-1">

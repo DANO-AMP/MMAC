@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
+use tracing::warn;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkConnection {
@@ -76,11 +77,23 @@ impl NetworkService {
 
         // Parse local address
         let local = parts[3];
-        let (local_addr, local_port) = self.parse_address(local)?;
+        let (local_addr, local_port) = match self.parse_address(local) {
+            Some(result) => result,
+            None => {
+                warn!("Failed to parse local address '{}' in netstat line", local);
+                return None;
+            }
+        };
 
         // Parse remote address
         let remote = parts[4];
-        let (remote_addr, remote_port) = self.parse_address(remote)?;
+        let (remote_addr, remote_port) = match self.parse_address(remote) {
+            Some(result) => result,
+            None => {
+                warn!("Failed to parse remote address '{}' in netstat line", remote);
+                return None;
+            }
+        };
 
         // State (for TCP)
         let state = if protocol == "TCP" && parts.len() > 5 {
@@ -90,7 +103,16 @@ impl NetworkService {
         };
 
         // PID is typically the last column
-        let pid: u32 = parts.last()?.parse().unwrap_or(0);
+        let pid: u32 = match parts.last() {
+            Some(pid_str) => match pid_str.parse() {
+                Ok(pid) => pid,
+                Err(_) => {
+                    warn!("Failed to parse PID '{}' in netstat line", pid_str);
+                    0
+                }
+            },
+            None => 0,
+        };
 
         Some(NetworkConnection {
             protocol: protocol.to_string(),
@@ -112,9 +134,47 @@ impl NetworkService {
 
         let last_dot = addr.rfind('.')?;
         let ip = &addr[..last_dot];
-        let port: u16 = addr[last_dot + 1..].parse().unwrap_or(0);
+        let port_str = &addr[last_dot + 1..];
+
+        // Validate and parse port
+        let port: u16 = match port_str.parse() {
+            Ok(p) => p,
+            Err(_) => {
+                warn!("Failed to parse port '{}' from address '{}'", port_str, addr);
+                return None;
+            }
+        };
+
+        // Basic IP address validation
+        if !self.is_valid_ip_format(ip) {
+            warn!("Invalid IP address format '{}' in address '{}'", ip, addr);
+            return None;
+        }
 
         Some((ip.to_string(), port))
+    }
+
+    fn is_valid_ip_format(&self, ip: &str) -> bool {
+        // Accept wildcard
+        if ip == "*" {
+            return true;
+        }
+
+        // Accept IPv6 formats (::1, fe80::1, etc.)
+        if ip.contains(':') {
+            // Basic IPv6 validation: should contain colons and valid hex characters
+            return ip.chars().all(|c| c.is_ascii_hexdigit() || c == ':');
+        }
+
+        // Validate IPv4 format: should have 3 dots and numeric octets
+        let octets: Vec<&str> = ip.split('.').collect();
+        if octets.len() != 4 {
+            return false;
+        }
+
+        octets.iter().all(|octet| {
+            octet.parse::<u8>().is_ok()
+        })
     }
 
     fn get_process_name(&self, pid: u32) -> String {

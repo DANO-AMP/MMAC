@@ -26,7 +26,27 @@ export default function StartupView() {
   };
 
   useEffect(() => {
-    loadItems();
+    let isMounted = true;
+
+    const loadInitialItems = async () => {
+      if (!isMounted) return;
+      setLoading(true);
+      try {
+        const result = await invoke<StartupItem[]>("get_startup_items");
+        if (isMounted) {
+          setItems(result);
+        }
+      } catch (error) {
+        console.error("Error loading startup items:", error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadInitialItems();
+    return () => { isMounted = false; };
   }, []);
 
   const toggleItem = async (item: StartupItem) => {
@@ -66,8 +86,9 @@ export default function StartupView() {
           onClick={loadItems}
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors"
+          aria-label="Actualizar lista de elementos de inicio"
         >
-          <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+          <RefreshCw size={18} className={loading ? "animate-spin" : ""} aria-hidden="true" />
           Actualizar
         </button>
       </div>
@@ -118,14 +139,16 @@ export default function StartupView() {
                           ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
                           : "bg-green-500/10 text-green-400 hover:bg-green-500/20"
                       }`}
+                      aria-label={item.enabled ? `Desactivar ${item.name}` : `Activar ${item.name}`}
+                      aria-pressed={item.enabled}
                     >
                       {item.enabled ? (
                         <>
-                          <PowerOff size={16} /> Desactivar
+                          <PowerOff size={16} aria-hidden="true" /> Desactivar
                         </>
                       ) : (
                         <>
-                          <Power size={16} /> Activar
+                          <Power size={16} aria-hidden="true" /> Activar
                         </>
                       )}
                     </button>
@@ -162,8 +185,9 @@ export default function StartupView() {
                     <button
                       onClick={() => removeLoginItem(item.name)}
                       className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                      aria-label={`Eliminar ${item.name} de elementos de inicio`}
                     >
-                      <Trash2 size={16} /> Eliminar
+                      <Trash2 size={16} aria-hidden="true" /> Eliminar
                     </button>
                   </div>
                 ))}

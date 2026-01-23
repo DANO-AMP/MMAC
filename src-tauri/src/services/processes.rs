@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
+use tracing::warn;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProcessInfo {
@@ -64,13 +65,49 @@ impl ProcessService {
         }
 
         let pid: u32 = parts[0].parse().ok()?;
-        let ppid: u32 = parts[1].parse().unwrap_or(0);
-        let cpu_usage: f32 = parts[2].parse().unwrap_or(0.0);
-        let rss_kb: f32 = parts[3].parse().unwrap_or(0.0);
-        let memory_percent: f32 = parts[4].parse().unwrap_or(0.0);
+
+        let ppid: u32 = match parts[1].parse() {
+            Ok(v) => v,
+            Err(_) => {
+                warn!("Failed to parse PPID '{}' for PID {}, using 0", parts[1], pid);
+                0
+            }
+        };
+
+        let cpu_usage: f32 = match parts[2].parse() {
+            Ok(v) => v,
+            Err(_) => {
+                warn!("Failed to parse CPU usage '{}' for PID {}, using 0.0", parts[2], pid);
+                0.0
+            }
+        };
+
+        let rss_kb: f32 = match parts[3].parse() {
+            Ok(v) => v,
+            Err(_) => {
+                warn!("Failed to parse RSS '{}' for PID {}, using 0.0", parts[3], pid);
+                0.0
+            }
+        };
+
+        let memory_percent: f32 = match parts[4].parse() {
+            Ok(v) => v,
+            Err(_) => {
+                warn!("Failed to parse memory percent '{}' for PID {}, using 0.0", parts[4], pid);
+                0.0
+            }
+        };
+
         let user = parts[5].to_string();
         let state = self.parse_state(parts[6]);
-        let threads: u32 = parts[7].parse().unwrap_or(1);
+
+        let threads: u32 = match parts[7].parse() {
+            Ok(v) => v,
+            Err(_) => {
+                warn!("Failed to parse thread count '{}' for PID {}, using 1", parts[7], pid);
+                1
+            }
+        };
 
         // The command can have spaces or be a path, join remaining parts
         let full_command = parts[8..].join(" ");

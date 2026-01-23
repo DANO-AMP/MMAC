@@ -58,7 +58,7 @@ function SettingsView() {
       {/* Sidebar */}
       <div className="w-56 pr-6 border-r border-dark-border">
         <h2 className="text-xl font-bold mb-6">Ajustes</h2>
-        <nav className="space-y-1">
+        <nav className="space-y-1" role="tablist" aria-label="Secciones de configuracion">
           {sections.map((section) => (
             <button
               key={section.id}
@@ -68,8 +68,11 @@ function SettingsView() {
                   ? "bg-primary-500/10 text-primary-400"
                   : "text-gray-400 hover:text-white hover:bg-white/5"
               }`}
+              role="tab"
+              aria-selected={activeSection === section.id}
+              aria-controls={`${section.id}-panel`}
             >
-              {section.icon}
+              <span aria-hidden="true">{section.icon}</span>
               <span>{section.title}</span>
             </button>
           ))}
@@ -79,14 +82,14 @@ function SettingsView() {
       {/* Content */}
       <div className="flex-1 pl-6 overflow-auto">
         {activeSection === "general" && (
-          <div>
+          <div role="tabpanel" id="general-panel" aria-labelledby="general-tab">
             <h3 className="text-lg font-semibold mb-6">Configuracion General</h3>
 
             <div className="space-y-6">
               <div className="bg-dark-card border border-dark-border rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">Escaneo automatico</p>
+                    <p className="font-medium" id="auto-scan-label">Escaneo automatico</p>
                     <p className="text-sm text-gray-400">
                       Escanear al iniciar la aplicacion
                     </p>
@@ -96,6 +99,9 @@ function SettingsView() {
                     className={`w-12 h-6 rounded-full transition-colors ${
                       settings.autoScan ? "bg-primary-500" : "bg-dark-border"
                     }`}
+                    role="switch"
+                    aria-checked={settings.autoScan}
+                    aria-labelledby="auto-scan-label"
                   >
                     <div
                       className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -109,7 +115,7 @@ function SettingsView() {
               <div className="bg-dark-card border border-dark-border rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">Mover a Papelera</p>
+                    <p className="font-medium" id="move-trash-label">Mover a Papelera</p>
                     <p className="text-sm text-gray-400">
                       Mover archivos a la papelera en lugar de eliminar permanentemente
                     </p>
@@ -119,6 +125,9 @@ function SettingsView() {
                     className={`w-12 h-6 rounded-full transition-colors ${
                       settings.moveToTrash ? "bg-primary-500" : "bg-dark-border"
                     }`}
+                    role="switch"
+                    aria-checked={settings.moveToTrash}
+                    aria-labelledby="move-trash-label"
                   >
                     <div
                       className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -132,7 +141,7 @@ function SettingsView() {
               <div className="bg-dark-card border border-dark-border rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">Confirmar eliminacion</p>
+                    <p className="font-medium" id="confirm-delete-label">Confirmar eliminacion</p>
                     <p className="text-sm text-gray-400">
                       Pedir confirmacion antes de eliminar archivos
                     </p>
@@ -142,6 +151,9 @@ function SettingsView() {
                     className={`w-12 h-6 rounded-full transition-colors ${
                       settings.confirmDelete ? "bg-primary-500" : "bg-dark-border"
                     }`}
+                    role="switch"
+                    aria-checked={settings.confirmDelete}
+                    aria-labelledby="confirm-delete-label"
                   >
                     <div
                       className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -157,7 +169,7 @@ function SettingsView() {
               <div className="bg-dark-card border border-dark-border rounded-xl p-4">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="font-medium">Proteger proyectos recientes</p>
+                    <p className="font-medium" id="protect-recent-label">Proteger proyectos recientes</p>
                     <p className="text-sm text-gray-400">
                       Ocultar proyectos modificados recientemente
                     </p>
@@ -167,6 +179,9 @@ function SettingsView() {
                     className={`w-12 h-6 rounded-full transition-colors ${
                       settings.protectRecent ? "bg-primary-500" : "bg-dark-border"
                     }`}
+                    role="switch"
+                    aria-checked={settings.protectRecent}
+                    aria-labelledby="protect-recent-label"
                   >
                     <div
                       className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -179,10 +194,11 @@ function SettingsView() {
                 </div>
                 {settings.protectRecent && (
                   <div>
-                    <label className="text-sm text-gray-400">
+                    <label htmlFor="recent-days" className="text-sm text-gray-400">
                       Dias de proteccion
                     </label>
                     <input
+                      id="recent-days"
                       type="number"
                       value={settings.recentDays}
                       onChange={(e) =>
@@ -200,7 +216,7 @@ function SettingsView() {
         )}
 
         {activeSection === "permissions" && (
-          <div>
+          <div role="tabpanel" id="permissions-panel" aria-labelledby="permissions-tab">
             <h3 className="text-lg font-semibold mb-6">Permisos del Sistema</h3>
 
             <div className="space-y-4">
@@ -295,12 +311,12 @@ function SettingsView() {
         )}
 
         {activeSection === "about" && (
-          <div>
+          <div role="tabpanel" id="about-panel" aria-labelledby="about-tab">
             <h3 className="text-lg font-semibold mb-6">Acerca de SysMac</h3>
 
             <div className="bg-dark-card border border-dark-border rounded-xl p-6 text-center">
               <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
-                <Settings size={40} className="text-white" />
+                <Settings size={40} className="text-white" aria-hidden="true" />
               </div>
               <h4 className="text-xl font-bold">{APP_NAME}</h4>
               <p className="text-gray-400 mt-1">Version {APP_VERSION}</p>
@@ -315,8 +331,8 @@ function SettingsView() {
               </div>
 
               <div className="mt-6 flex justify-center gap-4">
-                <button className="flex items-center gap-2 px-4 py-2 bg-dark-border hover:bg-dark-border/80 rounded-lg transition-colors">
-                  <ExternalLink size={16} />
+                <button className="flex items-center gap-2 px-4 py-2 bg-dark-border hover:bg-dark-border/80 rounded-lg transition-colors" aria-label="Abrir repositorio de GitHub">
+                  <ExternalLink size={16} aria-hidden="true" />
                   <span>GitHub</span>
                 </button>
               </div>
@@ -325,12 +341,12 @@ function SettingsView() {
         )}
 
         {activeSection === "appearance" && (
-          <div>
+          <div role="tabpanel" id="appearance-panel" aria-labelledby="appearance-tab">
             <h3 className="text-lg font-semibold mb-6">Apariencia</h3>
 
             <div className="bg-dark-card border border-dark-border rounded-xl p-4">
-              <p className="font-medium mb-4">Tema</p>
-              <div className="grid grid-cols-2 gap-4">
+              <p className="font-medium mb-4" id="theme-label">Tema</p>
+              <div className="grid grid-cols-2 gap-4" role="radiogroup" aria-labelledby="theme-label">
                 <button
                   onClick={() => updateSettings({ theme: "dark" })}
                   className={`p-4 rounded-xl border-2 transition-colors ${
@@ -338,8 +354,11 @@ function SettingsView() {
                       ? "border-primary-500 bg-primary-500/10"
                       : "border-dark-border hover:border-dark-border/80"
                   }`}
+                  role="radio"
+                  aria-checked={settings.theme === "dark"}
+                  aria-label="Tema oscuro"
                 >
-                  <div className="w-full h-20 bg-dark-bg rounded-lg mb-3" />
+                  <div className="w-full h-20 bg-dark-bg rounded-lg mb-3" aria-hidden="true" />
                   <p className="font-medium">Oscuro</p>
                 </button>
                 <button
@@ -349,8 +368,11 @@ function SettingsView() {
                       ? "border-primary-500 bg-primary-500/10"
                       : "border-dark-border hover:border-dark-border/80"
                   }`}
+                  role="radio"
+                  aria-checked={settings.theme === "light"}
+                  aria-label="Tema claro"
                 >
-                  <div className="w-full h-20 bg-gray-200 rounded-lg mb-3" />
+                  <div className="w-full h-20 bg-gray-200 rounded-lg mb-3" aria-hidden="true" />
                   <p className="font-medium">Claro</p>
                 </button>
               </div>
@@ -359,13 +381,13 @@ function SettingsView() {
         )}
 
         {activeSection === "notifications" && (
-          <div>
+          <div role="tabpanel" id="notifications-panel" aria-labelledby="notifications-tab">
             <h3 className="text-lg font-semibold mb-6">Notificaciones</h3>
 
             <div className="bg-dark-card border border-dark-border rounded-xl p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">Activar notificaciones</p>
+                  <p className="font-medium" id="notifications-label">Activar notificaciones</p>
                   <p className="text-sm text-gray-400">
                     Recibir alertas al completar tareas
                   </p>
@@ -375,6 +397,9 @@ function SettingsView() {
                   className={`w-12 h-6 rounded-full transition-colors ${
                     settings.notifications ? "bg-primary-500" : "bg-dark-border"
                   }`}
+                  role="switch"
+                  aria-checked={settings.notifications}
+                  aria-labelledby="notifications-label"
                 >
                   <div
                     className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -390,22 +415,22 @@ function SettingsView() {
         )}
 
         {activeSection === "whitelist" && (
-          <div>
+          <div role="tabpanel" id="whitelist-panel" aria-labelledby="whitelist-tab">
             <h3 className="text-lg font-semibold mb-6">Lista Blanca</h3>
 
             <div className="bg-dark-card border border-dark-border rounded-xl p-4">
               <p className="text-gray-400 mb-4">
                 Las siguientes rutas estan protegidas y no se eliminaran:
               </p>
-              <div className="space-y-2 font-mono text-sm">
-                <div className="p-2 bg-dark-bg rounded">/System</div>
-                <div className="p-2 bg-dark-bg rounded">/usr</div>
-                <div className="p-2 bg-dark-bg rounded">/bin</div>
-                <div className="p-2 bg-dark-bg rounded">/sbin</div>
-                <div className="p-2 bg-dark-bg rounded">~/Library/Keychains</div>
+              <div className="space-y-2 font-mono text-sm" role="list" aria-label="Rutas protegidas">
+                <div className="p-2 bg-dark-bg rounded" role="listitem">/System</div>
+                <div className="p-2 bg-dark-bg rounded" role="listitem">/usr</div>
+                <div className="p-2 bg-dark-bg rounded" role="listitem">/bin</div>
+                <div className="p-2 bg-dark-bg rounded" role="listitem">/sbin</div>
+                <div className="p-2 bg-dark-bg rounded" role="listitem">~/Library/Keychains</div>
               </div>
 
-              <button className="mt-4 text-primary-400 text-sm hover:underline">
+              <button className="mt-4 text-primary-400 text-sm hover:underline" aria-label="Agregar nueva ruta a la lista blanca">
                 + Agregar ruta personalizada
               </button>
             </div>

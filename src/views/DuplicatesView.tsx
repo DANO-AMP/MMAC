@@ -87,10 +87,11 @@ export default function DuplicatesView() {
       <div className="bg-dark-card rounded-xl border border-dark-border p-4 space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-2">
+            <label htmlFor="duplicates-path" className="block text-sm text-gray-400 mb-2">
               Carpeta a analizar
             </label>
             <input
+              id="duplicates-path"
               type="text"
               value={path}
               onChange={(e) => setPath(e.target.value)}
@@ -99,10 +100,11 @@ export default function DuplicatesView() {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-2">
-              Tamaño mínimo (MB)
+            <label htmlFor="duplicates-min-size" className="block text-sm text-gray-400 mb-2">
+              Tamano minimo (MB)
             </label>
             <input
+              id="duplicates-min-size"
               type="number"
               value={minSize}
               onChange={(e) => setMinSize(Number(e.target.value))}
@@ -115,15 +117,16 @@ export default function DuplicatesView() {
           onClick={startScan}
           disabled={scanning}
           className="flex items-center gap-2 px-6 py-2.5 bg-primary-500 hover:bg-primary-600 rounded-lg font-medium transition-colors disabled:opacity-50"
+          aria-label="Iniciar busqueda de archivos duplicados"
         >
           {scanning ? (
             <>
-              <RefreshCw className="animate-spin" size={18} />
+              <RefreshCw className="animate-spin" size={18} aria-hidden="true" />
               Escaneando...
             </>
           ) : (
             <>
-              <Search size={18} />
+              <Search size={18} aria-hidden="true" />
               Buscar Duplicados
             </>
           )}
@@ -132,22 +135,22 @@ export default function DuplicatesView() {
 
       {/* Results */}
       {result && (
-        <div className="space-y-4">
+        <div className="space-y-4" role="region" aria-label="Resultados del escaneo" aria-live="polite">
           {/* Summary */}
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-dark-card rounded-xl border border-dark-border p-4">
-              <p className="text-gray-400 text-sm">Archivos escaneados</p>
-              <p className="text-2xl font-bold">
+              <p className="text-gray-400 text-sm" id="scanned-label">Archivos escaneados</p>
+              <p className="text-2xl font-bold" aria-labelledby="scanned-label">
                 {result.files_scanned.toLocaleString()}
               </p>
             </div>
             <div className="bg-dark-card rounded-xl border border-dark-border p-4">
-              <p className="text-gray-400 text-sm">Grupos de duplicados</p>
-              <p className="text-2xl font-bold">{result.groups.length}</p>
+              <p className="text-gray-400 text-sm" id="groups-label">Grupos de duplicados</p>
+              <p className="text-2xl font-bold" aria-labelledby="groups-label">{result.groups.length}</p>
             </div>
             <div className="bg-dark-card rounded-xl border border-dark-border p-4">
-              <p className="text-gray-400 text-sm">Espacio recuperable</p>
-              <p className="text-2xl font-bold text-red-400">
+              <p className="text-gray-400 text-sm" id="recoverable-label">Espacio recuperable</p>
+              <p className="text-2xl font-bold text-red-400" aria-labelledby="recoverable-label">
                 {formatSize(result.total_wasted)}
               </p>
             </div>
@@ -196,17 +199,17 @@ export default function DuplicatesView() {
                           <button
                             onClick={() => revealInFinder(file)}
                             className="p-2 hover:bg-dark-border rounded-lg transition-colors"
-                            title="Mostrar en Finder"
+                            aria-label={`Mostrar ${file.split("/").pop()} en Finder`}
                           >
-                            <FolderOpen size={16} />
+                            <FolderOpen size={16} aria-hidden="true" />
                           </button>
                           {fileIdx > 0 && (
                             <button
                               onClick={() => deleteFile(file)}
                               className="p-2 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
-                              title="Eliminar"
+                              aria-label={`Eliminar ${file.split("/").pop()}`}
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={16} aria-hidden="true" />
                             </button>
                           )}
                         </div>

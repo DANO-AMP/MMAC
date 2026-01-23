@@ -73,8 +73,9 @@ function BluetoothView() {
           onClick={refresh}
           disabled={isLoading}
           className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors disabled:opacity-50"
+          aria-label="Actualizar dispositivos Bluetooth"
         >
-          <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
+          <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} aria-hidden="true" />
           <span>Actualizar</span>
         </button>
       </div>
@@ -89,16 +90,16 @@ function BluetoothView() {
         bluetooth?.is_powered
           ? "from-blue-600/20 to-blue-800/20 border-blue-500/30"
           : "from-gray-600/20 to-gray-800/20 border-gray-500/30"
-      } border rounded-xl p-6 mb-6`}>
+      } border rounded-xl p-6 mb-6`} role="region" aria-label="Estado de Bluetooth" aria-live="polite">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className={`p-3 rounded-xl ${
               bluetooth?.is_powered ? "bg-blue-500/20" : "bg-gray-500/20"
             }`}>
               {bluetooth?.is_powered ? (
-                <BluetoothConnected size={32} className="text-blue-400" />
+                <BluetoothConnected size={32} className="text-blue-400" aria-hidden="true" />
               ) : (
-                <BluetoothOff size={32} className="text-gray-400" />
+                <BluetoothOff size={32} className="text-gray-400" aria-hidden="true" />
               )}
             </div>
             <div>
@@ -111,7 +112,7 @@ function BluetoothView() {
             </div>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-blue-400">{connectedDevices.length}</p>
+            <p className="text-3xl font-bold text-blue-400" aria-label={`${connectedDevices.length} dispositivos conectados`}>{connectedDevices.length}</p>
             <p className="text-sm text-gray-400">Conectados</p>
           </div>
         </div>
@@ -119,12 +120,12 @@ function BluetoothView() {
 
       {/* Connected Devices */}
       {connectedDevices.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <BluetoothConnected size={20} className="text-blue-400" />
+        <div className="mb-6" role="region" aria-labelledby="connected-devices-title">
+          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2" id="connected-devices-title">
+            <BluetoothConnected size={20} className="text-blue-400" aria-hidden="true" />
             Dispositivos Conectados
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" role="list">
             {connectedDevices.map((device: BluetoothDevice, index: number) => (
               <div
                 key={`${device.address}-${index}`}
@@ -158,12 +159,12 @@ function BluetoothView() {
 
       {/* Paired Devices (not connected) */}
       {pairedDevices.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Bluetooth size={20} className="text-gray-400" />
+        <div role="region" aria-labelledby="paired-devices-title">
+          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2" id="paired-devices-title">
+            <Bluetooth size={20} className="text-gray-400" aria-hidden="true" />
             Dispositivos Emparejados
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" role="list">
             {pairedDevices.map((device: BluetoothDevice, index: number) => (
               <div
                 key={`${device.address}-${index}`}

@@ -57,7 +57,95 @@ function ProjectsView() {
   const [showRecent, setShowRecent] = useState(false);
 
   useEffect(() => {
-    scanProjects();
+    let isMounted = true;
+
+    const loadInitialData = async () => {
+      if (!isMounted) return;
+      setIsScanning(true);
+      try {
+        const result: ProjectArtifact[] = await invoke("scan_project_artifacts");
+        if (isMounted) {
+          setArtifacts(result);
+        }
+      } catch (error) {
+        console.error("Scan error:", error);
+        // Demo data
+        if (isMounted) {
+          const demoData: ProjectArtifact[] = [
+            {
+              project_path: "~/projects/my-react-app",
+              project_name: "my-react-app",
+              artifact_type: "node_modules",
+              artifact_path: "~/projects/my-react-app/node_modules",
+              size: 450 * 1024 * 1024,
+              last_modified: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+              is_recent: false,
+            },
+            {
+              project_path: "~/projects/next-blog",
+              project_name: "next-blog",
+              artifact_type: "node_modules",
+              artifact_path: "~/projects/next-blog/node_modules",
+              size: 380 * 1024 * 1024,
+              last_modified: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+              is_recent: false,
+            },
+            {
+              project_path: "~/projects/rust-cli",
+              project_name: "rust-cli",
+              artifact_type: "target",
+              artifact_path: "~/projects/rust-cli/target",
+              size: 2.5 * 1024 * 1024 * 1024,
+              last_modified: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+              is_recent: false,
+            },
+            {
+              project_path: "~/projects/python-api",
+              project_name: "python-api",
+              artifact_type: "venv",
+              artifact_path: "~/projects/python-api/venv",
+              size: 250 * 1024 * 1024,
+              last_modified: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+              is_recent: false,
+            },
+            {
+              project_path: "~/projects/vue-dashboard",
+              project_name: "vue-dashboard",
+              artifact_type: "node_modules",
+              artifact_path: "~/projects/vue-dashboard/node_modules",
+              size: 320 * 1024 * 1024,
+              last_modified: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              is_recent: true,
+            },
+            {
+              project_path: "~/projects/go-service",
+              project_name: "go-service",
+              artifact_type: "build",
+              artifact_path: "~/projects/go-service/build",
+              size: 85 * 1024 * 1024,
+              last_modified: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+              is_recent: false,
+            },
+            {
+              project_path: "~/projects/tauri-app",
+              project_name: "tauri-app",
+              artifact_type: "target",
+              artifact_path: "~/projects/tauri-app/src-tauri/target",
+              size: 3.2 * 1024 * 1024 * 1024,
+              last_modified: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+              is_recent: true,
+            },
+          ];
+          setArtifacts(demoData);
+        }
+      }
+      if (isMounted) {
+        setIsScanning(false);
+      }
+    };
+
+    loadInitialData();
+    return () => { isMounted = false; };
   }, []);
 
   const scanProjects = async () => {
@@ -239,8 +327,9 @@ function ProjectsView() {
           onClick={scanProjects}
           disabled={isScanning}
           className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors disabled:opacity-50"
+          aria-label="Escanear artefactos de proyectos de desarrollo"
         >
-          <RefreshCw size={18} className={isScanning ? "animate-spin" : ""} />
+          <RefreshCw size={18} className={isScanning ? "animate-spin" : ""} aria-hidden="true" />
           <span>Escanear</span>
         </button>
       </div>
@@ -273,6 +362,8 @@ function ProjectsView() {
             <button
               onClick={selectAll}
               className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
+              aria-label="Seleccionar todos los artefactos"
+              aria-pressed={selectedArtifacts.size === filteredArtifacts.length && filteredArtifacts.length > 0}
             >
               <div
                 className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
@@ -281,6 +372,7 @@ function ProjectsView() {
                     ? "border-primary-500 bg-primary-500"
                     : "border-gray-500"
                 }`}
+                aria-hidden="true"
               >
                 {selectedArtifacts.size === filteredArtifacts.length &&
                   filteredArtifacts.length > 0 && (
@@ -290,7 +382,7 @@ function ProjectsView() {
               <span>Seleccionar todo</span>
             </button>
 
-            <div className="h-6 w-px bg-dark-border" />
+            <div className="h-6 w-px bg-dark-border" aria-hidden="true" />
 
             <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
               <input
@@ -298,6 +390,7 @@ function ProjectsView() {
                 checked={showRecent}
                 onChange={(e) => setShowRecent(e.target.checked)}
                 className="rounded border-gray-500"
+                aria-label="Incluir proyectos modificados recientemente"
               />
               <span>Incluir proyectos recientes (&lt;7 dias)</span>
             </label>
@@ -313,11 +406,12 @@ function ProjectsView() {
               onClick={cleanSelected}
               disabled={selectedArtifacts.size === 0 || isCleaning}
               className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label={`Eliminar ${selectedArtifacts.size} artefactos seleccionados`}
             >
               {isCleaning ? (
-                <RefreshCw size={16} className="animate-spin" />
+                <RefreshCw size={16} className="animate-spin" aria-hidden="true" />
               ) : (
-                <Trash2 size={16} />
+                <Trash2 size={16} aria-hidden="true" />
               )}
               <span>Eliminar Seleccionados</span>
             </button>
@@ -368,9 +462,11 @@ function ProjectsView() {
                       ? "border-primary-500 bg-primary-500"
                       : "border-gray-500"
                   }`}
+                  aria-label={`Seleccionar ${artifact.project_name}`}
+                  aria-pressed={selectedArtifacts.has(artifact.artifact_path)}
                 >
                   {selectedArtifacts.has(artifact.artifact_path) && (
-                    <CheckCircle2 size={14} className="text-white" />
+                    <CheckCircle2 size={14} className="text-white" aria-hidden="true" />
                   )}
                 </button>
 

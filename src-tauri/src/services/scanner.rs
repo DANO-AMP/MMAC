@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Command;
+use tracing::warn;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PortInfo {
@@ -24,46 +25,90 @@ impl PortScannerService {
     }
 
     pub async fn scan(&self) -> Result<Vec<PortInfo>, Box<dyn std::error::Error + Send + Sync>> {
-        let output = Command::new("lsof")
-            .args(["-i", "-P", "-n"])
-            .output()?;
+        let listening_ports = tokio::task::spawn_blocking(move || {
+            let output = Command::new("lsof")
+                .args(["-i", "-P", "-n"])
+                .output()?;
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let mut ports_map: HashMap<(u16, u32), PortInfo> = HashMap::new();
-
-        for line in stdout.lines().skip(1) {
-            // Only process LISTEN entries (actual servers)
-            if !line.contains("LISTEN") {
-                continue;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                warn!("lsof command failed with status {}: {}", output.status, stderr);
+                // Return empty list instead of failing completely
+                return Ok::<Vec<PortInfo>, std::io::Error>(Vec::new());
             }
 
-            if let Some(port_info) = self.parse_lsof_line(line) {
-                let key = (port_info.port, port_info.pid);
-                if !ports_map.contains_key(&key) {
-                    ports_map.insert(key, port_info);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+
+            // Validate output format - first line should be the header
+            let first_line = stdout.lines().next().unwrap_or("");
+            if !first_line.contains("COMMAND") || !first_line.contains("PID") {
+                warn!(
+                    "Unexpected lsof output format. Expected header with COMMAND and PID, got: '{}'",
+                    first_line
+                );
+                return Ok(Vec::new());
+            }
+
+            let scanner = PortScannerService::new();
+            let mut ports_map: HashMap<(u16, u32), PortInfo> = HashMap::new();
+            let mut parse_errors = 0;
+
+            for (line_num, line) in stdout.lines().skip(1).enumerate() {
+                // Only process LISTEN entries (actual servers)
+                if !line.contains("LISTEN") {
+                    continue;
+                }
+
+                match scanner.parse_lsof_line(line) {
+                    Some(port_info) => {
+                        let key = (port_info.port, port_info.pid);
+                        if !ports_map.contains_key(&key) {
+                            ports_map.insert(key, port_info);
+                        }
+                    }
+                    None => {
+                        parse_errors += 1;
+                        if parse_errors <= 5 {
+                            // Only log first 5 errors to avoid log spam
+                            warn!(
+                                "Failed to parse lsof line {} (LISTEN entry): '{}'",
+                                line_num + 2,
+                                line
+                            );
+                        }
+                    }
                 }
             }
-        }
 
-        // Filter to only listening ports (servers)
-        let mut listening_ports: Vec<PortInfo> = ports_map
-            .into_values()
-            .filter(|p| p.port > 0)
-            .collect();
-
-        // Enrich with process info
-        for port in &mut listening_ports {
-            if let Some((cmd, cwd, cpu, mem)) = self.get_process_info(port.pid) {
-                port.command = Some(cmd);
-                port.working_dir = cwd;
-                port.cpu_usage = cpu;
-                port.memory_mb = mem;
+            if parse_errors > 5 {
+                warn!(
+                    "Suppressed {} additional lsof parse errors",
+                    parse_errors - 5
+                );
             }
-            port.service_type = self.detect_service_type(port.port, &port.process_name);
-        }
 
-        // Sort by port number
-        listening_ports.sort_by(|a, b| a.port.cmp(&b.port));
+            // Filter to only listening ports (servers)
+            let mut listening_ports: Vec<PortInfo> = ports_map
+                .into_values()
+                .filter(|p| p.port > 0)
+                .collect();
+
+            // Enrich with process info
+            for port in &mut listening_ports {
+                if let Some((cmd, cwd, cpu, mem)) = scanner.get_process_info(port.pid) {
+                    port.command = Some(cmd);
+                    port.working_dir = cwd;
+                    port.cpu_usage = cpu;
+                    port.memory_mb = mem;
+                }
+                port.service_type = scanner.detect_service_type(port.port, &port.process_name);
+            }
+
+            // Sort by port number
+            listening_ports.sort_by(|a, b| a.port.cmp(&b.port));
+
+            Ok(listening_ports)
+        }).await.map_err(|e| e.to_string())??;
 
         Ok(listening_ports)
     }
@@ -139,23 +184,62 @@ impl PortScannerService {
     fn get_process_info(&self, pid: u32) -> Option<(String, Option<String>, f32, f32)> {
         // Get command line, CPU and memory usage
         let cmd_output = Command::new("ps")
+            .env("LC_ALL", "C")
             .args(["-p", &pid.to_string(), "-o", "command=,%cpu=,rss="])
             .output()
             .ok()?;
 
+        if !cmd_output.status.success() {
+            warn!(
+                "ps command failed for PID {}: {}",
+                pid,
+                String::from_utf8_lossy(&cmd_output.stderr)
+            );
+            return None;
+        }
+
         let output = String::from_utf8_lossy(&cmd_output.stdout);
         let output = output.trim();
+
+        if output.is_empty() {
+            warn!("Empty ps output for PID {}", pid);
+            return None;
+        }
 
         // Parse the output - format is: "command %cpu rss"
         // RSS is in KB, we convert to MB
         let parts: Vec<&str> = output.rsplitn(3, char::is_whitespace).collect();
 
         let (cmd, cpu, mem_kb) = if parts.len() >= 3 {
-            let rss: f32 = parts[0].trim().parse().unwrap_or(0.0);
-            let cpu: f32 = parts[1].trim().parse().unwrap_or(0.0);
+            let rss: f32 = match parts[0].trim().parse() {
+                Ok(v) => v,
+                Err(_) => {
+                    warn!(
+                        "Failed to parse RSS '{}' for PID {}, using fallback",
+                        parts[0], pid
+                    );
+                    0.0
+                }
+            };
+            let cpu: f32 = match parts[1].trim().parse() {
+                Ok(v) => v,
+                Err(_) => {
+                    warn!(
+                        "Failed to parse CPU '{}' for PID {}, using fallback",
+                        parts[1], pid
+                    );
+                    0.0
+                }
+            };
             let cmd = parts[2].trim().to_string();
             (cmd, cpu, rss)
         } else {
+            warn!(
+                "Unexpected ps output format for PID {}: '{}' (expected 3 parts, got {})",
+                pid,
+                output,
+                parts.len()
+            );
             (output.to_string(), 0.0, 0.0)
         };
 

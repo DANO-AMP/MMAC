@@ -62,7 +62,32 @@ function OrphanedView() {
   };
 
   useEffect(() => {
-    loadData();
+    let isMounted = true;
+
+    const loadInitialData = async () => {
+      if (!isMounted) return;
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result: OrphanedScanResult = await invoke("scan_orphaned_files");
+        if (isMounted) {
+          setScanResult(result);
+          setSelectedFiles(new Set());
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadInitialData();
+    return () => { isMounted = false; };
   }, []);
 
   const getFileTypeIcon = (type: string) => {
@@ -194,8 +219,9 @@ function OrphanedView() {
           onClick={() => loadData(true)}
           disabled={isScanning}
           className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors disabled:opacity-50"
+          aria-label="Escanear archivos huerfanos"
         >
-          <RefreshCw size={18} className={isScanning ? "animate-spin" : ""} />
+          <RefreshCw size={18} className={isScanning ? "animate-spin" : ""} aria-hidden="true" />
           <span>Escanear</span>
         </button>
       </div>
@@ -228,20 +254,21 @@ function OrphanedView() {
                 onClick={handleDelete}
                 disabled={isDeleting}
                 className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50"
+                aria-label={`Eliminar ${selectedFiles.size} archivos seleccionados`}
               >
                 {isDeleting ? (
                   <>
-                    <RefreshCw size={20} className="animate-spin" />
+                    <RefreshCw size={20} className="animate-spin" aria-hidden="true" />
                     <span>Eliminando...</span>
                   </>
                 ) : (
                   <>
-                    <Trash2 size={20} />
+                    <Trash2 size={20} aria-hidden="true" />
                     <span>Eliminar ({selectedFiles.size})</span>
                   </>
                 )}
               </button>
-              <p className="text-sm text-gray-400 mt-2">
+              <p className="text-sm text-gray-400 mt-2" aria-live="polite">
                 {formatSize(selectedSize)} seleccionados
               </p>
             </div>
@@ -249,8 +276,8 @@ function OrphanedView() {
         </div>
 
         {isDeleting && (
-          <div className="mt-4">
-            <div className="h-2 bg-dark-bg rounded-full overflow-hidden">
+          <div className="mt-4" role="status" aria-live="polite">
+            <div className="h-2 bg-dark-bg rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(deleteProgress)} aria-valuemin={0} aria-valuemax={100} aria-label="Progreso de eliminacion">
               <div
                 className="h-full bg-red-500 transition-all duration-300"
                 style={{ width: `${deleteProgress}%` }}
@@ -277,16 +304,17 @@ function OrphanedView() {
       {/* Search and filter */}
       <div className="flex gap-4 mb-4">
         <div className="flex-1 relative">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" aria-hidden="true" />
           <input
             type="text"
             placeholder="Buscar por nombre de app o ruta..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-dark-card border border-dark-border rounded-lg focus:outline-none focus:border-primary-500"
+            aria-label="Buscar archivos huerfanos por nombre de app o ruta"
           />
         </div>
-        <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden">
+        <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden" role="group" aria-label="Filtrar archivos por tipo">
           {[
             { id: "all", label: "Todos" },
             { id: "data", label: "Datos" },
@@ -302,6 +330,7 @@ function OrphanedView() {
                   ? "bg-primary-500/20 text-primary-400"
                   : "text-gray-400 hover:text-white hover:bg-dark-border"
               }`}
+              aria-pressed={filter === f.id}
             >
               {f.label}
             </button>
@@ -318,6 +347,7 @@ function OrphanedView() {
               checked={selectedFiles.size === filteredFiles.length && filteredFiles.length > 0}
               onChange={toggleAll}
               className="w-4 h-4 rounded border-dark-border text-primary-500 focus:ring-primary-500 focus:ring-offset-0 bg-dark-bg"
+              aria-label="Seleccionar todos los archivos"
             />
           </div>
           <div className="col-span-4">App Probable</div>
@@ -346,6 +376,7 @@ function OrphanedView() {
                     checked={selectedFiles.has(file.path)}
                     onChange={() => toggleFile(file.path)}
                     className="w-4 h-4 rounded border-dark-border text-primary-500 focus:ring-primary-500 focus:ring-offset-0 bg-dark-bg"
+                    aria-label={`Seleccionar ${file.likely_app}`}
                   />
                 </div>
                 <div className="col-span-4">
@@ -377,9 +408,9 @@ function OrphanedView() {
                       handleDelete();
                     }}
                     className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-                    title="Eliminar"
+                    aria-label={`Eliminar ${file.likely_app}`}
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={16} aria-hidden="true" />
                   </button>
                 </div>
               </div>

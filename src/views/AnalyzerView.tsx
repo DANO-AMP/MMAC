@@ -49,7 +49,31 @@ function AnalyzerView() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadPath(currentPath.join("/"));
+    let isMounted = true;
+
+    const loadInitialPath = async () => {
+      if (!isMounted) return;
+      const path = currentPath.join("/");
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const result: DiskItem[] = await invoke("analyze_path", { path });
+        if (isMounted) {
+          setItems(result.sort((a, b) => b.size - a.size));
+        }
+      } catch (error) {
+        console.error("Analyze error:", error);
+        if (isMounted) {
+          setLoadError(error instanceof Error ? error.message : String(error));
+        }
+      }
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialPath();
+    return () => { isMounted = false; };
   }, []);
 
   const loadPath = async (path: string) => {
@@ -167,10 +191,10 @@ function AnalyzerView() {
       )}
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-1 mb-4 text-sm overflow-x-auto pb-2">
+      <nav className="flex items-center gap-1 mb-4 text-sm overflow-x-auto pb-2" aria-label="Ruta de navegacion">
         {currentPath.map((segment, idx) => (
           <div key={idx} className="flex items-center">
-            {idx > 0 && <ChevronRight size={14} className="text-gray-500 mx-1" />}
+            {idx > 0 && <ChevronRight size={14} className="text-gray-500 mx-1" aria-hidden="true" />}
             <button
               onClick={() => goToPath(idx)}
               className={`px-2 py-1 rounded hover:bg-dark-card transition-colors ${
@@ -178,22 +202,24 @@ function AnalyzerView() {
                   ? "text-primary-400 font-medium"
                   : "text-gray-400"
               }`}
+              aria-label={segment === "~" ? "Carpeta de inicio" : `Ir a ${segment}`}
+              aria-current={idx === currentPath.length - 1 ? "page" : undefined}
             >
-              {segment === "~" ? <Home size={14} /> : segment}
+              {segment === "~" ? <Home size={14} aria-hidden="true" /> : segment}
             </button>
           </div>
         ))}
         {isLoading && (
-          <RefreshCw size={14} className="animate-spin text-primary-400 ml-2" />
+          <RefreshCw size={14} className="animate-spin text-primary-400 ml-2" role="status" aria-label="Cargando" />
         )}
-      </div>
+      </nav>
 
       <div className="flex-1 flex gap-6 min-h-0">
         {/* Treemap / List */}
         <div className="flex-1 bg-dark-card border border-dark-border rounded-xl overflow-hidden">
           <div className="h-full overflow-auto p-4">
             {/* Size bars */}
-            <div className="space-y-2">
+            <div className="space-y-2" role="list" aria-label="Lista de archivos y carpetas">
               {items.map((item) => {
                 const percentage = (item.size / maxSize) * 100;
                 const color = getColorForSize(item.size, totalAnalyzed);
@@ -203,6 +229,16 @@ function AnalyzerView() {
                     key={item.path}
                     onClick={() => setSelectedItem(item)}
                     onDoubleClick={() => navigateTo(item)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        if (item.is_dir) navigateTo(item);
+                        else setSelectedItem(item);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="listitem"
+                    aria-label={`${item.name}, ${formatSize(item.size)}, ${item.is_dir ? "carpeta" : "archivo"}`}
+                    aria-selected={selectedItem?.path === item.path}
                     className={`relative cursor-pointer rounded-lg overflow-hidden transition-all ${
                       selectedItem?.path === item.path
                         ? "ring-2 ring-primary-500"
@@ -295,13 +331,14 @@ function AnalyzerView() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2" role="group" aria-label="Acciones">
                 {selectedItem.is_dir && (
                   <button
                     onClick={() => navigateTo(selectedItem)}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                    aria-label={`Abrir carpeta ${selectedItem.name}`}
                   >
-                    <FolderOpen size={16} />
+                    <FolderOpen size={16} aria-hidden="true" />
                     <span>Abrir</span>
                   </button>
                 )}
@@ -309,16 +346,18 @@ function AnalyzerView() {
                 <button
                   onClick={() => revealInFinder(selectedItem.path)}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-dark-border hover:bg-dark-border/80 text-white rounded-lg transition-colors"
+                  aria-label={`Mostrar ${selectedItem.name} en Finder`}
                 >
-                  <Eye size={16} />
+                  <Eye size={16} aria-hidden="true" />
                   <span>Mostrar en Finder</span>
                 </button>
 
                 <button
                   onClick={() => moveToTrash(selectedItem.path)}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg transition-colors"
+                  aria-label={`Mover ${selectedItem.name} a la papelera`}
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={16} aria-hidden="true" />
                   <span>Mover a Papelera</span>
                 </button>
               </div>

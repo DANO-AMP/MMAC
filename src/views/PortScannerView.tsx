@@ -87,14 +87,49 @@ function PortScannerView() {
   };
 
   useEffect(() => {
-    scanPorts();
+    let isMounted = true;
+    const loadInitialData = async () => {
+      if (!isMounted) return;
+      setIsScanning(true);
+      setScanError(null);
+      try {
+        const result: PortInfo[] = await invoke("scan_ports");
+        if (isMounted) {
+          setPorts(result);
+        }
+      } catch (error) {
+        console.error("Port scan error:", error);
+        if (isMounted) {
+          setScanError(error instanceof Error ? error.message : String(error));
+        }
+      }
+      if (isMounted) {
+        setIsScanning(false);
+      }
+    };
+    loadInitialData();
+    return () => { isMounted = false; };
   }, []);
 
   // Auto-refresh
   useEffect(() => {
     if (!autoRefresh) return;
-    const interval = setInterval(scanPorts, 5000);
-    return () => clearInterval(interval);
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      if (!isMounted) return;
+      try {
+        const result: PortInfo[] = await invoke("scan_ports");
+        if (isMounted) {
+          setPorts(result);
+        }
+      } catch (error) {
+        console.error("Port scan error:", error);
+      }
+    }, 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [autoRefresh]);
 
   const openInBrowser = (port: number) => {
@@ -127,7 +162,7 @@ function PortScannerView() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold">Escaner de Puertos</h2>
+          <h2 className="text-2xl font-bold" id="port-scanner-title">Escaner de Puertos</h2>
           <p className="text-gray-400 mt-1">
             Detecta servicios web corriendo en tu Mac
           </p>
@@ -140,16 +175,19 @@ function PortScannerView() {
                 ? "bg-green-500/20 text-green-400 border border-green-500/30"
                 : "bg-dark-card border border-dark-border text-gray-400 hover:text-white"
             }`}
+            aria-label={autoRefresh ? "Desactivar actualizacion automatica" : "Activar actualizacion automatica"}
+            aria-pressed={autoRefresh}
           >
-            <Zap size={16} />
+            <Zap size={16} aria-hidden="true" />
             <span className="text-sm">Auto</span>
           </button>
           <button
             onClick={scanPorts}
             disabled={isScanning}
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50"
+            aria-label="Escanear puertos activos"
           >
-            <RefreshCw size={18} className={isScanning ? "animate-spin" : ""} />
+            <RefreshCw size={18} className={isScanning ? "animate-spin" : ""} aria-hidden="true" />
             <span>Escanear Puertos</span>
           </button>
         </div>
@@ -172,7 +210,7 @@ function PortScannerView() {
       )}
 
       {/* Filter tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6" role="tablist" aria-label="Filtrar por tipo de servicio">
         {[
           { id: "all", label: "Todos" },
           { id: "http", label: "Web" },
@@ -188,6 +226,9 @@ function PortScannerView() {
                 ? "bg-primary-500/20 text-primary-400 border border-primary-500/30"
                 : "bg-dark-card border border-dark-border text-gray-400 hover:text-white"
             }`}
+            role="tab"
+            aria-selected={filter === tab.id}
+            aria-controls="ports-panel"
           >
             {tab.label}
           </button>
@@ -230,30 +271,30 @@ function PortScannerView() {
 
       <div className="flex gap-6">
         {/* Ports list */}
-        <div className="flex-1">
+        <div className="flex-1" id="ports-panel" role="tabpanel" aria-live="polite">
           <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
-            <table className="w-full">
+            <table className="w-full" role="table" aria-labelledby="port-scanner-title">
               <thead>
                 <tr className="border-b border-dark-border">
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                  <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-gray-400">
                     Puerto
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                  <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-gray-400">
                     Servicio
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                  <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-gray-400">
                     Proceso
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                  <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-gray-400">
                     PID
                   </th>
-                  <th className="text-right px-4 py-3 text-sm font-medium text-gray-400">
+                  <th scope="col" className="text-right px-4 py-3 text-sm font-medium text-gray-400">
                     CPU
                   </th>
-                  <th className="text-right px-4 py-3 text-sm font-medium text-gray-400">
+                  <th scope="col" className="text-right px-4 py-3 text-sm font-medium text-gray-400">
                     RAM
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                  <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-gray-400">
                     Estado
                   </th>
                 </tr>
@@ -388,28 +429,31 @@ function PortScannerView() {
                   </div>
                 )}
 
-                <div className="pt-4 space-y-2">
+                <div className="pt-4 space-y-2" role="group" aria-label="Acciones del puerto">
                   <button
                     onClick={() => openInBrowser(selectedPort.port)}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                    aria-label={`Abrir puerto ${selectedPort.port} en navegador`}
                   >
-                    <ExternalLink size={16} />
+                    <ExternalLink size={16} aria-hidden="true" />
                     <span>Abrir en Navegador</span>
                   </button>
 
                   <button
                     onClick={() => copyUrl(selectedPort.port)}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-dark-border hover:bg-dark-border/80 text-white rounded-lg transition-colors"
+                    aria-label={`Copiar URL del puerto ${selectedPort.port}`}
                   >
-                    <Copy size={16} />
+                    <Copy size={16} aria-hidden="true" />
                     <span>Copiar URL</span>
                   </button>
 
                   <button
                     onClick={() => stopProcess(selectedPort.pid)}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg transition-colors"
+                    aria-label={`Detener proceso ${selectedPort.process_name}`}
                   >
-                    <Square size={16} />
+                    <Square size={16} aria-hidden="true" />
                     <span>Detener Proceso</span>
                   </button>
                 </div>

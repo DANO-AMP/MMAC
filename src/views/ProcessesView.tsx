@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Cpu,
@@ -53,7 +53,7 @@ function ProcessesView() {
     }
   };
 
-  const buildProcessTree = (procs: ProcessInfo[]): TreeNode[] => {
+  const buildProcessTree = useCallback((procs: ProcessInfo[]): TreeNode[] => {
     const nodeMap = new Map<number, TreeNode>();
     const roots: TreeNode[] = [];
 
@@ -75,9 +75,9 @@ function ProcessesView() {
     }
 
     return roots;
-  };
+  }, []);
 
-  const flattenTree = (nodes: TreeNode[]): TreeNode[] => {
+  const flattenTree = useCallback((nodes: TreeNode[]): TreeNode[] => {
     const result: TreeNode[] = [];
     const traverse = (node: TreeNode) => {
       result.push(node);
@@ -91,7 +91,7 @@ function ProcessesView() {
       traverse(root);
     }
     return result;
-  };
+  }, [expandedPids]);
 
   const toggleExpand = (pid: number) => {
     const newExpanded = new Set(expandedPids);
@@ -145,19 +145,19 @@ function ProcessesView() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold">Procesos</h2>
+          <h2 className="text-2xl font-bold" id="processes-title">Procesos</h2>
           <p className="text-gray-400 mt-1">
             Monitor de actividad del sistema
           </p>
         </div>
         <div className="flex items-center gap-2">
           {isLoading && (
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <div className="flex items-center gap-2 text-sm text-gray-400" role="status" aria-live="polite">
+              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" aria-hidden="true" />
               <span>Actualizando...</span>
             </div>
           )}
-          <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden">
+          <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden" role="group" aria-label="Modo de vista">
             <button
               onClick={() => setViewMode("list")}
               className={`flex items-center gap-1 px-3 py-2 transition-colors ${
@@ -165,9 +165,10 @@ function ProcessesView() {
                   ? "bg-primary-500/20 text-primary-400"
                   : "text-gray-400 hover:text-white"
               }`}
-              title="Vista de lista"
+              aria-label="Vista de lista"
+              aria-pressed={viewMode === "list"}
             >
-              <List size={16} />
+              <List size={16} aria-hidden="true" />
             </button>
             <button
               onClick={() => setViewMode("tree")}
@@ -176,17 +177,19 @@ function ProcessesView() {
                   ? "bg-primary-500/20 text-primary-400"
                   : "text-gray-400 hover:text-white"
               }`}
-              title="Vista de arbol"
+              aria-label="Vista de arbol"
+              aria-pressed={viewMode === "tree"}
             >
-              <GitBranch size={16} />
+              <GitBranch size={16} aria-hidden="true" />
             </button>
           </div>
           <button
             onClick={refresh}
             disabled={isLoading}
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50"
+            aria-label="Actualizar lista de procesos"
           >
-            <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
+            <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} aria-hidden="true" />
             <span>Actualizar</span>
           </button>
         </div>
@@ -263,6 +266,7 @@ function ProcessesView() {
           <Search
             size={18}
             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            aria-hidden="true"
           />
           <input
             type="text"
@@ -270,6 +274,7 @@ function ProcessesView() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-dark-card border border-dark-border rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-primary-500"
+            aria-label="Buscar proceso por nombre, PID, usuario"
           />
         </div>
       </div>
@@ -278,46 +283,66 @@ function ProcessesView() {
         {/* Processes table */}
         <div className="flex-1">
           <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
-            <div className="max-h-[500px] overflow-auto">
-              <table className="w-full">
+            <div className="max-h-[500px] overflow-auto" role="region" aria-label="Lista de procesos" aria-live="polite">
+              <table className="w-full" role="table" aria-labelledby="processes-title">
                 <thead className="sticky top-0 bg-dark-card z-10">
                   <tr className="border-b border-dark-border">
                     <th
+                      scope="col"
                       className="text-left px-4 py-3 text-sm font-medium text-gray-400 cursor-pointer hover:text-white"
                       onClick={() => handleSort("pid")}
+                      onKeyDown={(e) => e.key === "Enter" && handleSort("pid")}
+                      tabIndex={0}
+                      role="columnheader"
+                      aria-sort={sortField === "pid" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
                     >
                       <div className="flex items-center gap-1">
                         PID {getSortIcon("pid")}
                       </div>
                     </th>
                     <th
+                      scope="col"
                       className="text-left px-4 py-3 text-sm font-medium text-gray-400 cursor-pointer hover:text-white"
                       onClick={() => handleSort("name")}
+                      onKeyDown={(e) => e.key === "Enter" && handleSort("name")}
+                      tabIndex={0}
+                      role="columnheader"
+                      aria-sort={sortField === "name" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
                     >
                       <div className="flex items-center gap-1">
                         Proceso {getSortIcon("name")}
                       </div>
                     </th>
-                    <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                    <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-gray-400">
                       Usuario
                     </th>
                     <th
+                      scope="col"
                       className="text-right px-4 py-3 text-sm font-medium text-gray-400 cursor-pointer hover:text-white"
                       onClick={() => handleSort("cpu_usage")}
+                      onKeyDown={(e) => e.key === "Enter" && handleSort("cpu_usage")}
+                      tabIndex={0}
+                      role="columnheader"
+                      aria-sort={sortField === "cpu_usage" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
                     >
                       <div className="flex items-center justify-end gap-1">
                         CPU {getSortIcon("cpu_usage")}
                       </div>
                     </th>
                     <th
+                      scope="col"
                       className="text-right px-4 py-3 text-sm font-medium text-gray-400 cursor-pointer hover:text-white"
                       onClick={() => handleSort("memory_mb")}
+                      onKeyDown={(e) => e.key === "Enter" && handleSort("memory_mb")}
+                      tabIndex={0}
+                      role="columnheader"
+                      aria-sort={sortField === "memory_mb" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
                     >
                       <div className="flex items-center justify-end gap-1">
                         RAM {getSortIcon("memory_mb")}
                       </div>
                     </th>
-                    <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                    <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-gray-400">
                       Estado
                     </th>
                   </tr>
@@ -356,6 +381,8 @@ function ProcessesView() {
                                   toggleExpand(proc.pid);
                                 }}
                                 className="w-4 h-4 flex items-center justify-center text-gray-500 hover:text-white mr-1"
+                                aria-label={expandedPids.has(proc.pid) ? `Contraer procesos hijos de ${proc.name}` : `Expandir procesos hijos de ${proc.name}`}
+                                aria-expanded={expandedPids.has(proc.pid)}
                               >
                                 {expandedPids.has(proc.pid) ? "−" : "+"}
                               </button>
@@ -481,8 +508,8 @@ function ProcessesView() {
                 )}
 
                 <div className="pt-4 space-y-2">
-                  <p className="text-xs text-gray-500 mb-2">Enviar senal:</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <p className="text-xs text-gray-500 mb-2" id="signal-label">Enviar senal:</p>
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="signal-label">
                     <button
                       onClick={async () => {
                         const confirmed = await confirm({
@@ -495,8 +522,9 @@ function ProcessesView() {
                         if (confirmed) sendSignal(selectedProcess.pid, "SIGTERM");
                       }}
                       className="flex items-center justify-center gap-1 px-3 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30 rounded-lg transition-colors text-sm"
+                      aria-label={`Enviar senal TERM a ${selectedProcess.name}`}
                     >
-                      <Square size={14} />
+                      <Square size={14} aria-hidden="true" />
                       <span>TERM</span>
                     </button>
                     <button
@@ -511,22 +539,25 @@ function ProcessesView() {
                         if (confirmed) sendSignal(selectedProcess.pid, "SIGKILL");
                       }}
                       className="flex items-center justify-center gap-1 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg transition-colors text-sm"
+                      aria-label={`Enviar senal KILL a ${selectedProcess.name}`}
                     >
-                      <Zap size={14} />
+                      <Zap size={14} aria-hidden="true" />
                       <span>KILL</span>
                     </button>
                     <button
                       onClick={() => sendSignal(selectedProcess.pid, "SIGSTOP")}
                       className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 rounded-lg transition-colors text-sm"
+                      aria-label={`Enviar senal STOP a ${selectedProcess.name}`}
                     >
-                      <Pause size={14} />
+                      <Pause size={14} aria-hidden="true" />
                       <span>STOP</span>
                     </button>
                     <button
                       onClick={() => sendSignal(selectedProcess.pid, "SIGCONT")}
                       className="flex items-center justify-center gap-1 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 rounded-lg transition-colors text-sm"
+                      aria-label={`Enviar senal CONT a ${selectedProcess.name}`}
                     >
-                      <Play size={14} />
+                      <Play size={14} aria-hidden="true" />
                       <span>CONT</span>
                     </button>
                   </div>

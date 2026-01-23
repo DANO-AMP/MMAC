@@ -61,7 +61,31 @@ function ServicesView() {
   };
 
   useEffect(() => {
-    loadData();
+    let isMounted = true;
+
+    const loadInitialData = async () => {
+      if (!isMounted) return;
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result: ServicesResult = await invoke("list_launch_services");
+        if (isMounted) {
+          setServices(result);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadInitialData();
+    return () => { isMounted = false; };
   }, []);
 
   const handleStart = async (label: string) => {
@@ -169,8 +193,9 @@ function ServicesView() {
           onClick={() => loadData(true)}
           disabled={isRefreshing}
           className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors disabled:opacity-50"
+          aria-label="Actualizar lista de servicios"
         >
-          <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} />
+          <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} aria-hidden="true" />
           <span>Actualizar</span>
         </button>
       </div>
@@ -186,11 +211,11 @@ function ServicesView() {
           operationStatus.type === "success"
             ? "bg-green-500/10 border border-green-500/30"
             : "bg-red-500/10 border border-red-500/30"
-        }`}>
+        }`} role="status" aria-live="polite">
           {operationStatus.type === "success" ? (
-            <CheckCircle2 size={20} className="text-green-400" />
+            <CheckCircle2 size={20} className="text-green-400" aria-hidden="true" />
           ) : (
-            <AlertCircle size={20} className="text-red-400" />
+            <AlertCircle size={20} className="text-red-400" aria-hidden="true" />
           )}
           <span className={operationStatus.type === "success" ? "text-green-400" : "text-red-400"}>
             {operationStatus.message}
@@ -249,16 +274,17 @@ function ServicesView() {
       {/* Search and filter */}
       <div className="flex gap-4 mb-4">
         <div className="flex-1 relative">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" aria-hidden="true" />
           <input
             type="text"
             placeholder="Buscar servicios..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-dark-card border border-dark-border rounded-lg focus:outline-none focus:border-primary-500"
+            aria-label="Buscar servicios por nombre"
           />
         </div>
-        <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden">
+        <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden" role="group" aria-label="Filtrar servicios por estado">
           {[
             { id: "all", label: "Todos" },
             { id: "running", label: "Ejecutando" },
@@ -273,6 +299,7 @@ function ServicesView() {
                   ? "bg-primary-500/20 text-primary-400"
                   : "text-gray-400 hover:text-white hover:bg-dark-border"
               }`}
+              aria-pressed={filter === f.id}
             >
               {f.label}
             </button>
@@ -332,12 +359,12 @@ function ServicesView() {
                       onClick={() => handleStop(service.label)}
                       disabled={operatingOn !== null}
                       className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50"
-                      title="Detener"
+                      aria-label={`Detener servicio ${service.label}`}
                     >
                       {operatingOn === service.label ? (
-                        <RefreshCw size={16} className="animate-spin" />
+                        <RefreshCw size={16} className="animate-spin" aria-hidden="true" />
                       ) : (
-                        <Square size={16} />
+                        <Square size={16} aria-hidden="true" />
                       )}
                     </button>
                   ) : (
@@ -345,21 +372,21 @@ function ServicesView() {
                       onClick={() => handleStart(service.label)}
                       disabled={operatingOn !== null}
                       className="p-2 text-green-400 hover:bg-green-500/20 rounded-lg transition-colors disabled:opacity-50"
-                      title="Iniciar"
+                      aria-label={`Iniciar servicio ${service.label}`}
                     >
                       {operatingOn === service.label ? (
-                        <RefreshCw size={16} className="animate-spin" />
+                        <RefreshCw size={16} className="animate-spin" aria-hidden="true" />
                       ) : (
-                        <Play size={16} />
+                        <Play size={16} aria-hidden="true" />
                       )}
                     </button>
                   )}
                   <button
                     onClick={() => handleShowInfo(service.label)}
                     className="p-2 text-gray-400 hover:bg-dark-border rounded-lg transition-colors"
-                    title="Info"
+                    aria-label={`Ver informacion de ${service.label}`}
                   >
-                    <Info size={16} />
+                    <Info size={16} aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -370,16 +397,17 @@ function ServicesView() {
 
       {/* Service info modal */}
       {selectedService && serviceInfo && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="service-modal-title">
           <div className="bg-dark-card border border-dark-border rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">{selectedService}</h3>
+              <h3 className="font-semibold" id="service-modal-title">{selectedService}</h3>
               <button
                 onClick={() => {
                   setSelectedService(null);
                   setServiceInfo(null);
                 }}
                 className="text-gray-400 hover:text-white"
+                aria-label="Cerrar dialogo"
               >
                 &times;
               </button>

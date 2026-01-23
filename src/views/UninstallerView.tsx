@@ -38,7 +38,30 @@ function UninstallerView() {
   const [uninstallError, setUninstallError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadApps();
+    let isMounted = true;
+
+    const loadInitialApps = async () => {
+      if (!isMounted) return;
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const result: AppInfo[] = await invoke("list_installed_apps");
+        if (isMounted) {
+          setApps(result);
+        }
+      } catch (error) {
+        console.error("Failed to load apps:", error);
+        if (isMounted) {
+          setLoadError(error instanceof Error ? error.message : String(error));
+        }
+      }
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialApps();
+    return () => { isMounted = false; };
   }, []);
 
   const loadApps = async () => {
@@ -99,8 +122,9 @@ function UninstallerView() {
           onClick={loadApps}
           disabled={isLoading}
           className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors disabled:opacity-50"
+          aria-label="Actualizar lista de aplicaciones"
         >
-          <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
+          <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} aria-hidden="true" />
           <span>Actualizar</span>
         </button>
       </div>
@@ -126,6 +150,7 @@ function UninstallerView() {
         <Search
           size={18}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          aria-hidden="true"
         />
         <input
           type="text"
@@ -133,6 +158,7 @@ function UninstallerView() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-10 pr-4 py-2.5 bg-dark-card border border-dark-border rounded-lg focus:outline-none focus:border-primary-500 transition-colors"
+          aria-label="Buscar aplicaciones instaladas"
         />
       </div>
 
@@ -153,6 +179,11 @@ function UninstallerView() {
                   <div
                     key={app.bundle_id}
                     onClick={() => setSelectedApp(app)}
+                    onKeyDown={(e) => e.key === "Enter" && setSelectedApp(app)}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Seleccionar ${app.name}, ${formatSize(app.size + app.remnants_size)}`}
+                    aria-pressed={selectedApp?.bundle_id === app.bundle_id}
                     className={`p-4 cursor-pointer transition-colors ${
                       selectedApp?.bundle_id === app.bundle_id
                         ? "bg-primary-500/10"
@@ -254,15 +285,16 @@ function UninstallerView() {
                 onClick={handleUninstall}
                 disabled={isUninstalling}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg transition-colors disabled:opacity-50"
+                aria-label={`Desinstalar completamente ${selectedApp.name}`}
               >
                 {isUninstalling ? (
                   <>
-                    <RefreshCw size={18} className="animate-spin" />
+                    <RefreshCw size={18} className="animate-spin" aria-hidden="true" />
                     <span>Desinstalando...</span>
                   </>
                 ) : (
                   <>
-                    <Trash2 size={18} />
+                    <Trash2 size={18} aria-hidden="true" />
                     <span>Desinstalar Completamente</span>
                   </>
                 )}

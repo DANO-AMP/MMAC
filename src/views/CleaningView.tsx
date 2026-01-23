@@ -175,7 +175,49 @@ function CleaningView() {
   };
 
   useEffect(() => {
-    handleScan();
+    let isMounted = true;
+
+    const loadInitialData = async () => {
+      if (!isMounted) return;
+      setIsScanning(true);
+      setScanError(null);
+      setCategories((prev) =>
+        prev.map((c) => ({ ...c, scanning: true, size: 0, items: 0 }))
+      );
+
+      try {
+        const results: ScanResult[] = await invoke("scan_system");
+        if (isMounted) {
+          setCategories((prev) =>
+            prev.map((c) => {
+              const result = results.find((r) => r.category === c.id);
+              return {
+                ...c,
+                size: result?.size || 0,
+                items: result?.items || 0,
+                scanning: false,
+              };
+            })
+          );
+          setLastScanTime(new Date());
+        }
+      } catch (error) {
+        console.error("Scan error:", error);
+        if (isMounted) {
+          setScanError(error instanceof Error ? error.message : String(error));
+          setCategories((prev) =>
+            prev.map((c) => ({ ...c, scanning: false }))
+          );
+        }
+      }
+
+      if (isMounted) {
+        setIsScanning(false);
+      }
+    };
+
+    loadInitialData();
+    return () => { isMounted = false; };
   }, []);
 
   return (
@@ -192,8 +234,9 @@ function CleaningView() {
           onClick={handleScan}
           disabled={isScanning}
           className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors disabled:opacity-50"
+          aria-label="Escanear sistema en busca de archivos a limpiar"
         >
-          <RefreshCw size={18} className={isScanning ? "animate-spin" : ""} />
+          <RefreshCw size={18} className={isScanning ? "animate-spin" : ""} aria-hidden="true" />
           <span>Escanear</span>
         </button>
       </div>
@@ -208,11 +251,11 @@ function CleaningView() {
       )}
 
       {/* Total summary card */}
-      <div className="bg-gradient-to-r from-primary-600/20 to-primary-800/20 border border-primary-500/30 rounded-xl p-6 mb-6">
+      <div className="bg-gradient-to-r from-primary-600/20 to-primary-800/20 border border-primary-500/30 rounded-xl p-6 mb-6" role="region" aria-label="Resumen de limpieza">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-gray-400 text-sm">Espacio a liberar</p>
-            <p className="text-4xl font-bold text-primary-400 mt-1">
+            <p className="text-gray-400 text-sm" id="space-label">Espacio a liberar</p>
+            <p className="text-4xl font-bold text-primary-400 mt-1" aria-labelledby="space-label" aria-live="polite">
               {formatSize(totalSize)}
             </p>
             {lastScanTime && (
@@ -225,15 +268,16 @@ function CleaningView() {
             onClick={handleClean}
             disabled={isCleaning || totalSize === 0}
             className="flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label={isCleaning ? "Limpieza en progreso" : `Iniciar limpieza de ${formatSize(totalSize)}`}
           >
             {isCleaning ? (
               <>
-                <RefreshCw size={20} className="animate-spin" />
+                <RefreshCw size={20} className="animate-spin" aria-hidden="true" />
                 <span>Limpiando...</span>
               </>
             ) : (
               <>
-                <Play size={20} />
+                <Play size={20} aria-hidden="true" />
                 <span>Iniciar Limpieza</span>
               </>
             )}
@@ -242,8 +286,8 @@ function CleaningView() {
 
         {/* Progress bar */}
         {isCleaning && (
-          <div className="mt-4">
-            <div className="h-2 bg-dark-bg rounded-full overflow-hidden">
+          <div className="mt-4" role="status" aria-live="polite">
+            <div className="h-2 bg-dark-bg rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(cleaningProgress)} aria-valuemin={0} aria-valuemax={100} aria-label="Progreso de limpieza">
               <div
                 className="h-full bg-primary-500 transition-all duration-300 progress-active"
                 style={{ width: `${cleaningProgress}%` }}
@@ -257,11 +301,16 @@ function CleaningView() {
       </div>
 
       {/* Categories grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4" role="group" aria-label="Categorias de limpieza">
         {categories.map((category) => (
           <div
             key={category.id}
             onClick={() => toggleCategory(category.id)}
+            onKeyDown={(e) => e.key === "Enter" && toggleCategory(category.id)}
+            tabIndex={0}
+            role="checkbox"
+            aria-checked={category.selected}
+            aria-label={`${category.name}, ${formatSize(category.size)}, ${category.items} elementos`}
             className={`bg-dark-card border rounded-xl p-5 cursor-pointer transition-all card-hover ${
               category.selected
                 ? "border-primary-500/50 ring-1 ring-primary-500/20"
@@ -278,6 +327,7 @@ function CleaningView() {
                   className={
                     category.selected ? "text-primary-400" : "text-gray-400"
                   }
+                  aria-hidden="true"
                 >
                   {category.icon}
                 </div>
@@ -288,6 +338,7 @@ function CleaningView() {
                     ? "border-primary-500 bg-primary-500"
                     : "border-gray-500"
                 }`}
+                aria-hidden="true"
               >
                 {category.selected && (
                   <CheckCircle2 size={14} className="text-white" />
@@ -298,8 +349,8 @@ function CleaningView() {
             <h3 className="font-semibold mt-4">{category.name}</h3>
 
             {category.scanning ? (
-              <div className="flex items-center gap-2 mt-2 text-gray-400">
-                <RefreshCw size={14} className="animate-spin" />
+              <div className="flex items-center gap-2 mt-2 text-gray-400" role="status">
+                <RefreshCw size={14} className="animate-spin" aria-hidden="true" />
                 <span className="text-sm">Escaneando...</span>
               </div>
             ) : (

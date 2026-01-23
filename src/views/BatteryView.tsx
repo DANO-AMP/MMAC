@@ -82,8 +82,9 @@ export default function BatteryView() {
           onClick={refresh}
           disabled={isLoading}
           className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors disabled:opacity-50"
+          aria-label="Actualizar estado de bateria"
         >
-          <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
+          <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} aria-hidden="true" />
           Actualizar
         </button>
       </div>
@@ -91,14 +92,14 @@ export default function BatteryView() {
       {battery && (
         <>
           {/* Main battery status */}
-          <div className="bg-dark-card rounded-xl border border-dark-border p-6">
+          <div className="bg-dark-card rounded-xl border border-dark-border p-6" role="region" aria-label="Estado de bateria" aria-live="polite">
             <div className="flex items-center gap-6">
               <div className={`${getBatteryColor()}`}>
-                <BatteryIcon size={64} />
+                <BatteryIcon size={64} aria-hidden="true" />
               </div>
               <div className="flex-1">
                 <div className="flex items-baseline gap-3">
-                  <span className="text-5xl font-bold">
+                  <span className="text-5xl font-bold" aria-label={`Bateria al ${Math.round(battery.percentage)} por ciento`}>
                     {Math.round(battery.percentage)}%
                   </span>
                   <span className="text-gray-400">
@@ -107,8 +108,8 @@ export default function BatteryView() {
                 </div>
                 {battery.time_remaining && battery.time_remaining !== "Calculando..." && (
                   <div className="flex items-center gap-2 mt-2 text-gray-400">
-                    <Clock size={16} />
-                    {battery.time_remaining}
+                    <Clock size={16} aria-hidden="true" />
+                    <span aria-label={`Tiempo restante: ${battery.time_remaining}`}>{battery.time_remaining}</span>
                   </div>
                 )}
               </div>
@@ -116,7 +117,7 @@ export default function BatteryView() {
 
             {/* Progress bar */}
             <div className="mt-6">
-              <div className="h-4 bg-dark-bg rounded-full overflow-hidden">
+              <div className="h-4 bg-dark-bg rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(battery.percentage)} aria-valuemin={0} aria-valuemax={100} aria-label="Nivel de bateria">
                 <div
                   className={`h-full transition-all ${
                     battery.is_charging
@@ -132,13 +133,13 @@ export default function BatteryView() {
           </div>
 
           {/* Stats grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" role="region" aria-label="Estadisticas de bateria">
             <div className="bg-dark-card rounded-xl border border-dark-border p-4">
               <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <Heart size={18} />
-                <span className="text-sm">Salud</span>
+                <Heart size={18} aria-hidden="true" />
+                <span className="text-sm" id="health-label">Salud</span>
               </div>
-              <p className={`text-2xl font-bold ${getHealthColor(healthPercent)}`}>
+              <p className={`text-2xl font-bold ${getHealthColor(healthPercent)}`} aria-labelledby="health-label">
                 {healthPercent.toFixed(1)}%
               </p>
               <p className="text-sm text-gray-400 mt-1">{battery.health}</p>
@@ -146,19 +147,19 @@ export default function BatteryView() {
 
             <div className="bg-dark-card rounded-xl border border-dark-border p-4">
               <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <RefreshCw size={18} />
-                <span className="text-sm">Ciclos</span>
+                <RefreshCw size={18} aria-hidden="true" />
+                <span className="text-sm" id="cycles-label">Ciclos</span>
               </div>
-              <p className="text-2xl font-bold">{battery.cycle_count}</p>
+              <p className="text-2xl font-bold" aria-labelledby="cycles-label">{battery.cycle_count}</p>
               <p className="text-sm text-gray-400 mt-1">de ~1000 máximo</p>
             </div>
 
             <div className="bg-dark-card rounded-xl border border-dark-border p-4">
               <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <Thermometer size={18} />
-                <span className="text-sm">Temperatura</span>
+                <Thermometer size={18} aria-hidden="true" />
+                <span className="text-sm" id="battery-temp-label">Temperatura</span>
               </div>
-              <p className="text-2xl font-bold">{battery.temperature.toFixed(1)}°C</p>
+              <p className="text-2xl font-bold" aria-labelledby="battery-temp-label">{battery.temperature.toFixed(1)}°C</p>
               <p className="text-sm text-gray-400 mt-1">
                 {battery.temperature < 35 ? "Normal" : "Elevada"}
               </p>
@@ -166,10 +167,10 @@ export default function BatteryView() {
 
             <div className="bg-dark-card rounded-xl border border-dark-border p-4">
               <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <Zap size={18} />
-                <span className="text-sm">Potencia</span>
+                <Zap size={18} aria-hidden="true" />
+                <span className="text-sm" id="power-label">Potencia</span>
               </div>
-              <p className="text-2xl font-bold">
+              <p className="text-2xl font-bold" aria-labelledby="power-label">
                 {battery.wattage.toFixed(1)} W
               </p>
               <p className="text-sm text-gray-400 mt-1">

@@ -104,7 +104,7 @@ function MonitorView() {
         </div>
         <div className="flex items-center gap-2">
           {isLoading && (
-            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" role="status" aria-label="Cargando datos" />
           )}
           <button
             onClick={() => setIsLive(!isLive)}
@@ -113,11 +113,14 @@ function MonitorView() {
                 ? "bg-green-500/20 text-green-400 border border-green-500/30"
                 : "bg-dark-card border border-dark-border text-gray-400"
             }`}
+            aria-label={isLive ? "Pausar actualizacion en vivo" : "Activar actualizacion en vivo"}
+            aria-pressed={isLive}
           >
             <div
               className={`w-2 h-2 rounded-full ${
                 isLive ? "bg-green-500 animate-pulse" : "bg-gray-500"
               }`}
+              aria-hidden="true"
             />
             <span>{isLive ? "En vivo" : "Pausado"}</span>
           </button>
@@ -134,17 +137,17 @@ function MonitorView() {
       )}
 
       {/* Stats cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-4 gap-4 mb-6" role="region" aria-label="Estadisticas del sistema" aria-live="polite">
         {/* CPU */}
         <div className="bg-dark-card border border-dark-border rounded-xl p-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-blue-500/20 rounded-lg">
-              <Cpu size={20} className="text-blue-400" />
+              <Cpu size={20} className="text-blue-400" aria-hidden="true" />
             </div>
-            <span className="text-gray-400 text-sm">CPU</span>
+            <span className="text-gray-400 text-sm" id="cpu-label">CPU</span>
           </div>
-          <p className="text-3xl font-bold">{currentStats.cpu_usage.toFixed(1)}%</p>
-          <div className="mt-2 h-1.5 bg-dark-bg rounded-full overflow-hidden">
+          <p className="text-3xl font-bold" aria-labelledby="cpu-label">{currentStats.cpu_usage.toFixed(1)}%</p>
+          <div className="mt-2 h-1.5 bg-dark-bg rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(currentStats.cpu_usage)} aria-valuemin={0} aria-valuemax={100} aria-label="Uso de CPU">
             <div
               className="h-full bg-blue-500 transition-all duration-300"
               style={{ width: `${currentStats.cpu_usage}%` }}
@@ -156,15 +159,15 @@ function MonitorView() {
         <div className="bg-dark-card border border-dark-border rounded-xl p-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-purple-500/20 rounded-lg">
-              <MemoryStick size={20} className="text-purple-400" />
+              <MemoryStick size={20} className="text-purple-400" aria-hidden="true" />
             </div>
-            <span className="text-gray-400 text-sm">Memoria</span>
+            <span className="text-gray-400 text-sm" id="memory-label">Memoria</span>
           </div>
-          <p className="text-3xl font-bold">{memoryPercent.toFixed(1)}%</p>
+          <p className="text-3xl font-bold" aria-labelledby="memory-label">{memoryPercent.toFixed(1)}%</p>
           <p className="text-sm text-gray-400 mt-1">
             {formatSize(currentStats.memory_used)} / {formatSize(currentStats.memory_total)}
           </p>
-          <div className="mt-2 h-1.5 bg-dark-bg rounded-full overflow-hidden">
+          <div className="mt-2 h-1.5 bg-dark-bg rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(memoryPercent)} aria-valuemin={0} aria-valuemax={100} aria-label="Uso de memoria">
             <div
               className="h-full bg-purple-500 transition-all duration-300"
               style={{ width: `${memoryPercent}%` }}
@@ -176,15 +179,15 @@ function MonitorView() {
         <div className="bg-dark-card border border-dark-border rounded-xl p-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-orange-500/20 rounded-lg">
-              <HardDrive size={20} className="text-orange-400" />
+              <HardDrive size={20} className="text-orange-400" aria-hidden="true" />
             </div>
-            <span className="text-gray-400 text-sm">Disco</span>
+            <span className="text-gray-400 text-sm" id="disk-label">Disco</span>
           </div>
-          <p className="text-3xl font-bold">{diskPercent.toFixed(1)}%</p>
+          <p className="text-3xl font-bold" aria-labelledby="disk-label">{diskPercent.toFixed(1)}%</p>
           <p className="text-sm text-gray-400 mt-1">
             {formatSize(currentStats.disk_used)} / {formatSize(currentStats.disk_total)}
           </p>
-          <div className="mt-2 h-1.5 bg-dark-bg rounded-full overflow-hidden">
+          <div className="mt-2 h-1.5 bg-dark-bg rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(diskPercent)} aria-valuemin={0} aria-valuemax={100} aria-label="Uso de disco">
             <div
               className="h-full bg-orange-500 transition-all duration-300"
               style={{ width: `${diskPercent}%` }}
@@ -196,11 +199,11 @@ function MonitorView() {
         <div className="bg-dark-card border border-dark-border rounded-xl p-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-red-500/20 rounded-lg">
-              <Thermometer size={20} className="text-red-400" />
+              <Thermometer size={20} className="text-red-400" aria-hidden="true" />
             </div>
-            <span className="text-gray-400 text-sm">Temperatura</span>
+            <span className="text-gray-400 text-sm" id="temp-label">Temperatura</span>
           </div>
-          <p className="text-3xl font-bold">{currentStats.cpu_temp.toFixed(0)}C</p>
+          <p className="text-3xl font-bold" aria-labelledby="temp-label">{currentStats.cpu_temp.toFixed(0)}C</p>
           <p className="text-sm text-gray-400 mt-1">
             {currentStats.cpu_temp < 50
               ? "Normal"

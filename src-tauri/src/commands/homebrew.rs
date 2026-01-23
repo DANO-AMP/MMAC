@@ -1,7 +1,7 @@
 use crate::services::homebrew::{BrewPackage, HomebrewInfo, HomebrewService};
 
 #[tauri::command]
-pub fn get_homebrew_info() -> HomebrewInfo {
+pub fn get_homebrew_info() -> Result<HomebrewInfo, String> {
     let service = HomebrewService::new();
     service.check_homebrew()
 }

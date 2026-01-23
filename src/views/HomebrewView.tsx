@@ -78,7 +78,48 @@ function HomebrewView() {
   };
 
   useEffect(() => {
-    loadData();
+    let isMounted = true;
+
+    const loadInitialData = async () => {
+      if (!isMounted) return;
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const info: HomebrewInfo = await invoke("get_homebrew_info");
+        if (!isMounted) return;
+        setHomebrewInfo(info);
+
+        if (info.installed) {
+          const [pkgs, outdated] = await Promise.all([
+            invoke<BrewPackage[]>("list_brew_packages"),
+            invoke<BrewPackage[]>("get_outdated_packages"),
+          ]);
+          if (!isMounted) return;
+          setPackages(pkgs);
+          setOutdatedPackages(outdated);
+
+          // Mark packages as outdated in main list
+          const outdatedNames = new Set(outdated.map(p => p.name));
+          setPackages(pkgs.map(p => ({
+            ...p,
+            is_outdated: outdatedNames.has(p.name),
+            newer_version: outdated.find(o => o.name === p.name)?.newer_version || null,
+          })));
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadInitialData();
+    return () => { isMounted = false; };
   }, []);
 
   const handleUpgrade = async (pkg: BrewPackage) => {
@@ -196,8 +237,9 @@ function HomebrewView() {
           onClick={() => loadData(true)}
           disabled={isRefreshing}
           className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors disabled:opacity-50"
+          aria-label="Actualizar lista de paquetes"
         >
-          <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} />
+          <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} aria-hidden="true" />
           <span>Actualizar</span>
         </button>
       </div>
@@ -213,11 +255,11 @@ function HomebrewView() {
           operationStatus.type === "success"
             ? "bg-green-500/10 border border-green-500/30"
             : "bg-red-500/10 border border-red-500/30"
-        }`}>
+        }`} role="status" aria-live="polite">
           {operationStatus.type === "success" ? (
-            <CheckCircle2 size={20} className="text-green-400" />
+            <CheckCircle2 size={20} className="text-green-400" aria-hidden="true" />
           ) : (
-            <AlertCircle size={20} className="text-red-400" />
+            <AlertCircle size={20} className="text-red-400" aria-hidden="true" />
           )}
           <span className={operationStatus.type === "success" ? "text-green-400" : "text-red-400"}>
             {operationStatus.message}
@@ -289,11 +331,12 @@ function HomebrewView() {
                 onClick={handleCleanup}
                 disabled={operatingOn !== null}
                 className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:bg-dark-border transition-colors disabled:opacity-50"
+                aria-label="Limpiar cache de Homebrew"
               >
                 {operatingOn === "cleanup" ? (
-                  <RefreshCw size={18} className="animate-spin" />
+                  <RefreshCw size={18} className="animate-spin" aria-hidden="true" />
                 ) : (
-                  <Sparkles size={18} />
+                  <Sparkles size={18} aria-hidden="true" />
                 )}
                 <span>Limpiar</span>
               </button>
@@ -301,11 +344,12 @@ function HomebrewView() {
                 onClick={handleUpgradeAll}
                 disabled={operatingOn !== null}
                 className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors disabled:opacity-50"
+                aria-label="Actualizar todos los paquetes desactualizados"
               >
                 {operatingOn === "all" ? (
-                  <RefreshCw size={18} className="animate-spin" />
+                  <RefreshCw size={18} className="animate-spin" aria-hidden="true" />
                 ) : (
-                  <ArrowUpCircle size={18} />
+                  <ArrowUpCircle size={18} aria-hidden="true" />
                 )}
                 <span>Actualizar Todo</span>
               </button>
@@ -317,16 +361,17 @@ function HomebrewView() {
       {/* Search and filter */}
       <div className="flex gap-4 mb-4">
         <div className="flex-1 relative">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" aria-hidden="true" />
           <input
             type="text"
             placeholder="Buscar paquetes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-dark-card border border-dark-border rounded-lg focus:outline-none focus:border-primary-500"
+            aria-label="Buscar paquetes de Homebrew"
           />
         </div>
-        <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden">
+        <div className="flex bg-dark-card border border-dark-border rounded-lg overflow-hidden" role="group" aria-label="Filtrar paquetes">
           {[
             { id: "all", label: "Todos" },
             { id: "formulae", label: "Formulae" },
@@ -341,6 +386,7 @@ function HomebrewView() {
                   ? "bg-primary-500/20 text-primary-400"
                   : "text-gray-400 hover:text-white hover:bg-dark-border"
               }`}
+              aria-pressed={filter === f.id}
             >
               {f.label}
             </button>
@@ -401,12 +447,12 @@ function HomebrewView() {
                       onClick={() => handleUpgrade(pkg)}
                       disabled={operatingOn !== null}
                       className="p-2 text-yellow-400 hover:bg-yellow-500/20 rounded-lg transition-colors disabled:opacity-50"
-                      title="Actualizar"
+                      aria-label={`Actualizar ${pkg.name}`}
                     >
                       {operatingOn === pkg.name ? (
-                        <RefreshCw size={16} className="animate-spin" />
+                        <RefreshCw size={16} className="animate-spin" aria-hidden="true" />
                       ) : (
-                        <ArrowUpCircle size={16} />
+                        <ArrowUpCircle size={16} aria-hidden="true" />
                       )}
                     </button>
                   )}
@@ -414,9 +460,9 @@ function HomebrewView() {
                     onClick={() => handleUninstall(pkg)}
                     disabled={operatingOn !== null}
                     className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50"
-                    title="Desinstalar"
+                    aria-label={`Desinstalar ${pkg.name}`}
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={16} aria-hidden="true" />
                   </button>
                 </div>
               </div>

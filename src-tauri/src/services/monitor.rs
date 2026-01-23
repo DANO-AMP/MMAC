@@ -3,6 +3,7 @@ use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, Networks, RefreshKind, S
 use std::process::Command;
 use std::sync::Mutex;
 use std::time::Instant;
+use tracing::warn;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemStats {
@@ -119,7 +120,13 @@ impl MonitorService {
     }
 
     fn get_network_speed(&self) -> (u64, u64) {
-        let mut state_guard = self.network_state.lock().unwrap();
+        let mut state_guard = match self.network_state.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                warn!("Network state mutex was poisoned, recovering with inner data");
+                poisoned.into_inner()
+            }
+        };
 
         if let Some(ref mut state) = *state_guard {
             // Refresh existing networks
@@ -235,7 +242,13 @@ impl MonitorService {
     }
 
     fn get_disk_io_speed(&self) -> (u64, u64) {
-        let mut state_guard = self.disk_io_state.lock().unwrap();
+        let mut state_guard = match self.disk_io_state.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                warn!("Disk I/O state mutex was poisoned, recovering with inner data");
+                poisoned.into_inner()
+            }
+        };
 
         // Get current disk I/O stats using iostat
         let (current_read, current_write) = self.get_current_disk_io();
