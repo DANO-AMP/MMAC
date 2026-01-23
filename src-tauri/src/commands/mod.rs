@@ -1,6 +1,12 @@
 pub mod analyzer;
+pub mod battery;
 pub mod cleaning;
+pub mod duplicates;
+pub mod largefiles;
+pub mod memory;
 pub mod monitor;
+pub mod network;
 pub mod ports;
 pub mod projects;
+pub mod startup;
 pub mod uninstaller;

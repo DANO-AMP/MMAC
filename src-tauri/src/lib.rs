@@ -2,7 +2,8 @@ mod commands;
 mod services;
 
 use commands::{
-    analyzer::*, cleaning::*, monitor::*, ports::*, projects::*, uninstaller::*,
+    analyzer::*, battery::*, cleaning::*, duplicates::*, largefiles::*, memory::*, monitor::*,
+    network::*, ports::*, projects::*, startup::*, uninstaller::*,
 };
 use services::monitor::MonitorService;
 
@@ -32,6 +33,23 @@ pub fn run() {
             // Projects
             scan_project_artifacts,
             delete_artifact,
+            // Startup
+            get_startup_items,
+            toggle_startup_item,
+            remove_login_item,
+            // Duplicates
+            scan_duplicates,
+            // Large Files
+            find_large_files,
+            // Memory
+            get_memory_info,
+            purge_memory,
+            // Battery
+            get_battery_info,
+            // Network
+            get_active_connections,
+            get_hosts,
+            flush_dns,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
