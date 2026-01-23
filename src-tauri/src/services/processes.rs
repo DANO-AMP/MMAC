@@ -23,8 +23,10 @@ impl ProcessService {
 
     pub fn get_all_processes(&self) -> Vec<ProcessInfo> {
         // Use ps to get all processes with CPU, memory, user, state, threads
-        // Format: pid, %cpu, rss, %mem, user, state, threads, comm, args
+        // Format: pid, %cpu, rss, %mem, user, state, threads, comm
+        // Use LC_ALL=C to ensure decimal points (not commas) in numbers
         let output = Command::new("ps")
+            .env("LC_ALL", "C")
             .args([
                 "-axo",
                 "pid,%cpu,rss,%mem,user,state,wq,comm",
@@ -67,18 +69,27 @@ impl ProcessService {
         let user = parts[4].to_string();
         let state = self.parse_state(parts[5]);
         let threads: u32 = parts[6].parse().unwrap_or(1);
-        let name = parts[7].to_string();
+
+        // The command can have spaces or be a path, join remaining parts
+        let full_command = parts[7..].join(" ");
+
+        // Extract just the process name (basename) from the path
+        let name = full_command
+            .split('/')
+            .last()
+            .unwrap_or(&full_command)
+            .to_string();
 
         Some(ProcessInfo {
             pid,
-            name: name.clone(),
+            name,
             cpu_usage,
             memory_mb: rss_kb / 1024.0,
             memory_percent,
             user,
             state,
             threads,
-            command: name, // Will be enriched later for top processes
+            command: full_command,
         })
     }
 
@@ -159,6 +170,20 @@ mod tests {
         assert_eq!(proc.memory_mb, 100.0); // 102400 KB = 100 MB
         assert_eq!(proc.user, "user");
         assert_eq!(proc.state, "Suspendido");
+        assert_eq!(proc.name, "process_name");
+    }
+
+    #[test]
+    fn test_parse_ps_line_with_path() {
+        let service = ProcessService::new();
+        let line = "  5678  10.5 204800  1.0 root     R    2 /usr/bin/some_process";
+        let result = service.parse_ps_line(line);
+
+        assert!(result.is_some());
+        let proc = result.unwrap();
+        assert_eq!(proc.pid, 5678);
+        assert_eq!(proc.name, "some_process"); // Should extract basename
+        assert_eq!(proc.command, "/usr/bin/some_process");
     }
 
     #[test]
