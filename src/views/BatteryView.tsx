@@ -159,9 +159,9 @@ export default function BatteryView() {
                 <Thermometer size={18} aria-hidden="true" />
                 <span className="text-sm" id="battery-temp-label">Temperatura</span>
               </div>
-              <p className="text-2xl font-bold" aria-labelledby="battery-temp-label">{battery.temperature.toFixed(1)}°C</p>
+              <p className="text-2xl font-bold" aria-labelledby="battery-temp-label">{(battery.temperature ?? 0).toFixed(1)}°C</p>
               <p className="text-sm text-gray-400 mt-1">
-                {battery.temperature < 35 ? "Normal" : "Elevada"}
+                {(battery.temperature ?? 0) < 35 ? "Normal" : "Elevada"}
               </p>
             </div>
 
@@ -171,10 +171,10 @@ export default function BatteryView() {
                 <span className="text-sm" id="power-label">Potencia</span>
               </div>
               <p className="text-2xl font-bold" aria-labelledby="power-label">
-                {battery.wattage.toFixed(1)} W
+                {(battery.wattage ?? 0).toFixed(1)} W
               </p>
               <p className="text-sm text-gray-400 mt-1">
-                {battery.amperage > 0 ? "Cargando" : "Descargando"}
+                {(battery.amperage ?? 0) > 0 ? "Cargando" : "Descargando"}
               </p>
             </div>
           </div>
@@ -185,19 +185,19 @@ export default function BatteryView() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-400">Capacidad actual</span>
-                <span>{battery.max_capacity} mAh</span>
+                <span>{battery.max_capacity ?? 0} mAh</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Capacidad de diseño</span>
-                <span>{battery.design_capacity} mAh</span>
+                <span>{battery.design_capacity ?? 0} mAh</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Voltaje</span>
-                <span>{(battery.voltage / 1000).toFixed(2)} V</span>
+                <span>{((battery.voltage ?? 0) / 1000).toFixed(2)} V</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Corriente</span>
-                <span>{battery.amperage} mA</span>
+                <span>{battery.amperage ?? 0} mA</span>
               </div>
             </div>
           </div>
