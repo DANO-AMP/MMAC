@@ -10,6 +10,8 @@ import {
   RefreshCw,
   Home,
 } from "lucide-react";
+import { formatSize } from "../utils";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 interface DiskItem {
   name: string;
@@ -25,14 +27,6 @@ interface DiskInfo {
   available: number;
 }
 
-function formatSize(bytes: number): string {
-  if (!bytes || bytes <= 0 || !isFinite(bytes)) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-}
-
 function getColorForSize(size: number, maxSize: number): string {
   const ratio = size / maxSize;
   if (ratio > 0.3) return "bg-red-500";
@@ -42,7 +36,7 @@ function getColorForSize(size: number, maxSize: number): string {
 }
 
 function AnalyzerView() {
-  const [diskInfo, setDiskInfo] = useState<DiskInfo>({
+  const [diskInfo] = useState<DiskInfo>({
     total: 500 * 1024 * 1024 * 1024,
     used: 234 * 1024 * 1024 * 1024,
     available: 266 * 1024 * 1024 * 1024,
@@ -51,6 +45,8 @@ function AnalyzerView() {
   const [currentPath, setCurrentPath] = useState<string[]>(["~"]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<DiskItem | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     loadPath(currentPath.join("/"));
@@ -58,74 +54,13 @@ function AnalyzerView() {
 
   const loadPath = async (path: string) => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const result: DiskItem[] = await invoke("analyze_path", { path });
       setItems(result.sort((a, b) => b.size - a.size));
     } catch (error) {
       console.error("Analyze error:", error);
-      // Demo data
-      setItems([
-        {
-          name: "Library",
-          path: "~/Library",
-          size: 45 * 1024 * 1024 * 1024,
-          is_dir: true,
-        },
-        {
-          name: "Documents",
-          path: "~/Documents",
-          size: 32 * 1024 * 1024 * 1024,
-          is_dir: true,
-        },
-        {
-          name: "Downloads",
-          path: "~/Downloads",
-          size: 18 * 1024 * 1024 * 1024,
-          is_dir: true,
-        },
-        {
-          name: "Movies",
-          path: "~/Movies",
-          size: 15 * 1024 * 1024 * 1024,
-          is_dir: true,
-        },
-        {
-          name: "Desktop",
-          path: "~/Desktop",
-          size: 8 * 1024 * 1024 * 1024,
-          is_dir: true,
-        },
-        {
-          name: "Pictures",
-          path: "~/Pictures",
-          size: 6 * 1024 * 1024 * 1024,
-          is_dir: true,
-        },
-        {
-          name: "Music",
-          path: "~/Music",
-          size: 4 * 1024 * 1024 * 1024,
-          is_dir: true,
-        },
-        {
-          name: ".npm",
-          path: "~/.npm",
-          size: 3 * 1024 * 1024 * 1024,
-          is_dir: true,
-        },
-        {
-          name: ".cargo",
-          path: "~/.cargo",
-          size: 2.5 * 1024 * 1024 * 1024,
-          is_dir: true,
-        },
-        {
-          name: "Applications",
-          path: "~/Applications",
-          size: 1.2 * 1024 * 1024 * 1024,
-          is_dir: true,
-        },
-      ].sort((a, b) => b.size - a.size));
+      setLoadError(error instanceof Error ? error.message : String(error));
     }
     setIsLoading(false);
   };
@@ -149,20 +84,24 @@ function AnalyzerView() {
   const totalAnalyzed = items.reduce((acc, item) => acc + item.size, 0);
 
   const revealInFinder = async (path: string) => {
+    setActionError(null);
     try {
       await invoke("reveal_in_finder", { path });
     } catch (error) {
       console.error("Reveal error:", error);
+      setActionError(error instanceof Error ? error.message : String(error));
     }
   };
 
   const moveToTrash = async (path: string) => {
+    setActionError(null);
     try {
       await invoke("move_to_trash", { path });
       setItems((prev) => prev.filter((i) => i.path !== path));
       setSelectedItem(null);
     } catch (error) {
       console.error("Delete error:", error);
+      setActionError(error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -210,6 +149,22 @@ function AnalyzerView() {
           </div>
         </div>
       </div>
+
+      {/* Error banners */}
+      {loadError && (
+        <ErrorBanner
+          error={loadError}
+          onRetry={() => loadPath(currentPath.join("/"))}
+          className="mb-4"
+        />
+      )}
+      {actionError && (
+        <ErrorBanner
+          error={actionError}
+          onRetry={() => setActionError(null)}
+          className="mb-4"
+        />
+      )}
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-1 mb-4 text-sm overflow-x-auto pb-2">

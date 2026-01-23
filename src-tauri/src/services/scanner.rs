@@ -222,4 +222,96 @@ impl PortScannerService {
             _ => "Service".to_string(),
         }
     }
+
+    /// Parse lsof line for testing purposes.
+    #[cfg(test)]
+    pub fn parse_line_for_test(&self, line: &str) -> Option<PortInfo> {
+        self.parse_lsof_line(line)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_lsof_ipv4_listen() {
+        let service = PortScannerService::new();
+        let line = "node      12345 user   23u  IPv4 0x1234567890abcdef      0t0  TCP 127.0.0.1:3000 (LISTEN)";
+
+        let result = service.parse_line_for_test(line);
+        assert!(result.is_some());
+
+        let port_info = result.unwrap();
+        assert_eq!(port_info.port, 3000);
+        assert_eq!(port_info.pid, 12345);
+        assert_eq!(port_info.process_name, "node");
+        assert_eq!(port_info.local_address, "127.0.0.1");
+        assert_eq!(port_info.protocol, "TCP");
+    }
+
+    #[test]
+    fn test_parse_lsof_wildcard_address() {
+        let service = PortScannerService::new();
+        let line = "java       3456 user   45u  IPv4 0x1234567890abcde3      0t0  TCP *:8080 (LISTEN)";
+
+        let result = service.parse_line_for_test(line);
+        assert!(result.is_some());
+
+        let port_info = result.unwrap();
+        assert_eq!(port_info.port, 8080);
+        assert_eq!(port_info.local_address, "0.0.0.0");
+    }
+
+    #[test]
+    fn test_parse_lsof_ipv6() {
+        let service = PortScannerService::new();
+        let line = "python3    4567 user   12u  IPv6 0x1234567890abcde4      0t0  TCP [::1]:8888 (LISTEN)";
+
+        let result = service.parse_line_for_test(line);
+        assert!(result.is_some());
+
+        let port_info = result.unwrap();
+        assert_eq!(port_info.port, 8888);
+        assert_eq!(port_info.pid, 4567);
+        assert_eq!(port_info.local_address, "::1");
+    }
+
+    #[test]
+    fn test_detect_service_type_node() {
+        let service = PortScannerService::new();
+
+        assert_eq!(service.detect_service_type(3000, "node"), "Next.js / React");
+        assert_eq!(service.detect_service_type(5173, "node"), "Vite Dev Server");
+        assert_eq!(service.detect_service_type(4000, "node"), "Node.js Server");
+    }
+
+    #[test]
+    fn test_detect_service_type_python() {
+        let service = PortScannerService::new();
+
+        assert_eq!(service.detect_service_type(8888, "python3"), "Jupyter Notebook");
+        assert_eq!(service.detect_service_type(8000, "python3"), "Django / FastAPI");
+        assert_eq!(service.detect_service_type(5000, "python3"), "Flask");
+    }
+
+    #[test]
+    fn test_detect_service_type_databases() {
+        let service = PortScannerService::new();
+
+        assert_eq!(service.detect_service_type(5432, "postgres"), "PostgreSQL");
+        assert_eq!(service.detect_service_type(3306, "mysqld"), "MySQL");
+        assert_eq!(service.detect_service_type(27017, "mongod"), "MongoDB");
+        assert_eq!(service.detect_service_type(6379, "redis-server"), "Redis");
+    }
+
+    #[test]
+    fn test_detect_service_type_by_port_fallback() {
+        let service = PortScannerService::new();
+
+        // When process name doesn't match, fall back to port
+        assert_eq!(service.detect_service_type(80, "unknown"), "HTTP Server");
+        assert_eq!(service.detect_service_type(443, "unknown"), "HTTPS Server");
+        assert_eq!(service.detect_service_type(22, "unknown"), "SSH");
+    }
 }

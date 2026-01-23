@@ -9,6 +9,26 @@ pub struct StartupItem {
     pub enabled: bool,
 }
 
+/// Validates a name for use in AppleScript to prevent command injection.
+/// Returns the sanitized name or an error if the name contains forbidden characters.
+fn validate_applescript_name(name: &str) -> Result<String, String> {
+    if name.is_empty() {
+        return Err("Name cannot be empty".into());
+    }
+    if name.len() > 255 {
+        return Err("Name too long (max 255 characters)".into());
+    }
+
+    let forbidden = ['\"', '\\', '\n', '\r', '\0'];
+    for c in name.chars() {
+        if forbidden.contains(&c) || c.is_control() {
+            return Err(format!("Invalid character in name: {:?}", c));
+        }
+    }
+
+    Ok(name.to_string())
+}
+
 pub struct StartupService;
 
 impl StartupService {
@@ -116,8 +136,11 @@ impl StartupService {
     }
 
     pub fn remove_login_item(&self, name: &str) -> Result<(), String> {
+        // Validate name to prevent AppleScript injection
+        let validated_name = validate_applescript_name(name)?;
+
         Command::new("osascript")
-            .args(["-e", &format!("tell application \"System Events\" to delete login item \"{}\"", name)])
+            .args(["-e", &format!("tell application \"System Events\" to delete login item \"{}\"", validated_name)])
             .output()
             .map_err(|e| e.to_string())?;
         Ok(())

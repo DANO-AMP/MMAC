@@ -33,7 +33,7 @@ impl MonitorService {
         }
     }
 
-    pub fn get_stats(&self) -> SystemStats {
+    pub async fn get_stats(&self) -> SystemStats {
         let mut sys = System::new();
         sys.refresh_specifics(
             RefreshKind::new()
@@ -41,8 +41,8 @@ impl MonitorService {
                 .with_memory(MemoryRefreshKind::everything()),
         );
 
-        // Wait a bit for CPU measurement
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        // Wait a bit for CPU measurement using async sleep (non-blocking)
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         sys.refresh_cpu_usage();
 
         // CPU usage

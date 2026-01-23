@@ -186,11 +186,36 @@ impl CleaningService {
                 home.join("Library/Caches/Firefox"),
             ],
             "trash" => {
-                // Empty trash using system command
-                std::process::Command::new("rm")
-                    .args(["-rf", &home.join(".Trash/*").to_string_lossy()])
-                    .output()?;
-                return Ok(0);
+                // Empty trash using safe Rust filesystem operations
+                let trash_path = home.join(".Trash");
+                let mut cleaned_size = 0u64;
+
+                if trash_path.exists() {
+                    // Calculate size of items in trash before deletion
+                    for entry in WalkDir::new(&trash_path)
+                        .into_iter()
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.file_type().is_file())
+                    {
+                        if let Ok(metadata) = entry.metadata() {
+                            cleaned_size += metadata.len();
+                        }
+                    }
+
+                    // Delete each item in trash individually (safer than rm -rf)
+                    if let Ok(entries) = std::fs::read_dir(&trash_path) {
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            if path.is_dir() {
+                                let _ = std::fs::remove_dir_all(&path);
+                            } else {
+                                let _ = std::fs::remove_file(&path);
+                            }
+                        }
+                    }
+                }
+
+                return Ok(cleaned_size);
             }
             _ => return Err("Unknown category".into()),
         };

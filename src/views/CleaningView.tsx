@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+import { formatSize } from "../utils";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 interface CleaningCategory {
   id: string;
@@ -26,14 +28,6 @@ interface ScanResult {
   size: number;
   items: number;
   paths: string[];
-}
-
-function formatSize(bytes: number): string {
-  if (!bytes || bytes <= 0 || !isFinite(bytes)) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
 function CleaningView() {
@@ -80,6 +74,7 @@ function CleaningView() {
   const [isCleaning, setIsCleaning] = useState(false);
   const [cleaningProgress, setCleaningProgress] = useState(0);
   const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const totalSize = categories
     .filter((c) => c.selected)
@@ -87,6 +82,7 @@ function CleaningView() {
 
   const handleScan = async () => {
     setIsScanning(true);
+    setScanError(null);
     setCategories((prev) =>
       prev.map((c) => ({ ...c, scanning: true, size: 0, items: 0 }))
     );
@@ -107,16 +103,10 @@ function CleaningView() {
       setLastScanTime(new Date());
     } catch (error) {
       console.error("Scan error:", error);
-      // Demo data for UI preview
+      setScanError(error instanceof Error ? error.message : String(error));
       setCategories((prev) =>
-        prev.map((c) => ({
-          ...c,
-          size: Math.floor(Math.random() * 5000000000) + 100000000,
-          items: Math.floor(Math.random() * 500) + 10,
-          scanning: false,
-        }))
+        prev.map((c) => ({ ...c, scanning: false }))
       );
-      setLastScanTime(new Date());
     }
 
     setIsScanning(false);
@@ -177,6 +167,15 @@ function CleaningView() {
           <span>Escanear</span>
         </button>
       </div>
+
+      {/* Error banner */}
+      {scanError && (
+        <ErrorBanner
+          error={scanError}
+          onRetry={handleScan}
+          className="mb-6"
+        />
+      )}
 
       {/* Total summary card */}
       <div className="bg-gradient-to-r from-primary-600/20 to-primary-800/20 border border-primary-500/30 rounded-xl p-6 mb-6">

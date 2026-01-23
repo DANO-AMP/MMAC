@@ -16,6 +16,8 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import { formatSize, formatSpeed } from "../utils";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 interface SystemStats {
   cpu_usage: number;
@@ -36,18 +38,6 @@ interface ChartData {
   network_tx: number;
 }
 
-function formatBytes(bytes: number): string {
-  if (!bytes || bytes <= 0 || !isFinite(bytes)) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-}
-
-function formatSpeed(bytesPerSec: number): string {
-  return formatBytes(bytesPerSec) + "/s";
-}
-
 function MonitorView() {
   const [stats, setStats] = useState<SystemStats>({
     cpu_usage: 0,
@@ -62,6 +52,7 @@ function MonitorView() {
 
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [isLive, setIsLive] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLive) return;
@@ -73,6 +64,7 @@ function MonitorView() {
         const result: SystemStats = await invoke("get_system_stats");
         if (!isMounted) return;
         setStats(result);
+        setError(null);
 
         const now = new Date();
         const timeStr = now.toLocaleTimeString("es-ES", {
@@ -94,41 +86,11 @@ function MonitorView() {
           ];
           return newData.slice(-30);
         });
-      } catch (error) {
-        // Demo data
-        const cpu = Math.random() * 60 + 20;
-        const memory = Math.random() * 40 + 40;
-        setStats({
-          cpu_usage: cpu,
-          memory_used: (memory / 100) * 16 * 1024 * 1024 * 1024,
-          memory_total: 16 * 1024 * 1024 * 1024,
-          disk_used: 234 * 1024 * 1024 * 1024,
-          disk_total: 500 * 1024 * 1024 * 1024,
-          network_rx: Math.random() * 5 * 1024 * 1024,
-          network_tx: Math.random() * 2 * 1024 * 1024,
-          cpu_temp: 45 + Math.random() * 20,
-        });
-
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString("es-ES", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        });
-
-        setChartData((prev) => {
-          const newData = [
-            ...prev,
-            {
-              time: timeStr,
-              cpu,
-              memory,
-              network_rx: Math.random() * 5 * 1024 * 1024,
-              network_tx: Math.random() * 2 * 1024 * 1024,
-            },
-          ];
-          return newData.slice(-30);
-        });
+      } catch (err) {
+        console.error("Failed to fetch system stats:", err);
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       }
     };
 
@@ -170,6 +132,15 @@ function MonitorView() {
         </button>
       </div>
 
+      {/* Error banner */}
+      {error && (
+        <ErrorBanner
+          error={error}
+          onRetry={() => setError(null)}
+          className="mb-6"
+        />
+      )}
+
       {/* Stats cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         {/* CPU */}
@@ -199,7 +170,7 @@ function MonitorView() {
           </div>
           <p className="text-3xl font-bold">{memoryPercent.toFixed(1)}%</p>
           <p className="text-sm text-gray-400 mt-1">
-            {formatBytes(stats.memory_used)} / {formatBytes(stats.memory_total)}
+            {formatSize(stats.memory_used)} / {formatSize(stats.memory_total)}
           </p>
           <div className="mt-2 h-1.5 bg-dark-bg rounded-full overflow-hidden">
             <div
@@ -219,7 +190,7 @@ function MonitorView() {
           </div>
           <p className="text-3xl font-bold">{diskPercent.toFixed(1)}%</p>
           <p className="text-sm text-gray-400 mt-1">
-            {formatBytes(stats.disk_used)} / {formatBytes(stats.disk_total)}
+            {formatSize(stats.disk_used)} / {formatSize(stats.disk_total)}
           </p>
           <div className="mt-2 h-1.5 bg-dark-bg rounded-full overflow-hidden">
             <div

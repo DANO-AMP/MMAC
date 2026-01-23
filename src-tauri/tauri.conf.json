@@ -27,7 +27,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost"
     },
     "macOSPrivateApi": true
   },
@@ -45,7 +45,7 @@
     "shortDescription": "Sistema de optimizacion para macOS",
     "longDescription": "SysMac es una aplicacion de optimizacion y monitoreo para macOS que te permite limpiar caches, desinstalar apps, analizar disco y monitorear el sistema.",
     "macOS": {
-      "entitlements": null,
+      "entitlements": "entitlements.plist",
       "minimumSystemVersion": "10.15"
     }
   },

@@ -157,21 +157,110 @@ impl NetworkService {
     }
 
     pub fn flush_dns(&self) -> Result<String, String> {
-        // macOS DNS flush
+        // macOS DNS flush - dscacheutil doesn't require sudo
         let output = Command::new("dscacheutil")
             .args(["-flushcache"])
             .output()
             .map_err(|e| e.to_string())?;
 
-        // Also restart mDNSResponder
-        let _ = Command::new("sudo")
-            .args(["killall", "-HUP", "mDNSResponder"])
-            .output();
-
         if output.status.success() {
-            Ok("Caché DNS vaciada".to_string())
+            // Note: Full DNS flush also requires `sudo killall -HUP mDNSResponder`
+            // which needs admin privileges. We flush what we can without sudo.
+            Ok(
+                "Caché DNS de usuario vaciada.\n\n\
+                 Para vaciar completamente, ejecuta en Terminal:\n\
+                 sudo killall -HUP mDNSResponder"
+                    .to_string(),
+            )
         } else {
-            Ok("Caché DNS vaciada (parcial)".to_string())
+            Err("Error al vaciar caché DNS".to_string())
         }
+    }
+
+    /// Parse netstat line for testing purposes.
+    #[cfg(test)]
+    pub fn parse_netstat_line_for_test(&self, line: &str, protocol: &str) -> Option<NetworkConnection> {
+        self.parse_netstat_line(line, protocol)
+    }
+
+    /// Parse address for testing purposes.
+    #[cfg(test)]
+    pub fn parse_address_for_test(&self, addr: &str) -> Option<(String, u16)> {
+        self.parse_address(addr)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_address_ipv4() {
+        let service = NetworkService::new();
+        let result = service.parse_address_for_test("127.0.0.1.3000");
+        assert!(result.is_some());
+        let (addr, port) = result.unwrap();
+        assert_eq!(addr, "127.0.0.1");
+        assert_eq!(port, 3000);
+    }
+
+    #[test]
+    fn test_parse_address_wildcard() {
+        let service = NetworkService::new();
+        let result = service.parse_address_for_test("*.*");
+        assert!(result.is_some());
+        let (addr, port) = result.unwrap();
+        assert_eq!(addr, "*");
+        assert_eq!(port, 0);
+    }
+
+    #[test]
+    fn test_parse_address_ipv6_localhost() {
+        let service = NetworkService::new();
+        let result = service.parse_address_for_test("::1.8888");
+        assert!(result.is_some());
+        let (addr, port) = result.unwrap();
+        assert_eq!(addr, "::1");
+        assert_eq!(port, 8888);
+    }
+
+    #[test]
+    fn test_parse_netstat_line_tcp_listen() {
+        let service = NetworkService::new();
+        // Real macOS netstat -anvp tcp output format with enough columns
+        let line = "tcp4       0      0  127.0.0.1.3000         *.*                    LISTEN      131072 131072  12345      0";
+        let result = service.parse_netstat_line_for_test(line, "TCP");
+        assert!(result.is_some());
+
+        let conn = result.unwrap();
+        assert_eq!(conn.protocol, "TCP");
+        assert_eq!(conn.local_address, "127.0.0.1");
+        assert_eq!(conn.local_port, 3000);
+        assert_eq!(conn.state, "LISTEN");
+    }
+
+    #[test]
+    fn test_parse_netstat_line_tcp_established() {
+        let service = NetworkService::new();
+        // Real macOS netstat -anvp tcp output format with enough columns
+        let line = "tcp4       0      0  192.168.1.10.52345     172.217.14.99.443      ESTABLISHED 131072 131072  54321      0";
+        let result = service.parse_netstat_line_for_test(line, "TCP");
+        assert!(result.is_some());
+
+        let conn = result.unwrap();
+        assert_eq!(conn.local_address, "192.168.1.10");
+        assert_eq!(conn.local_port, 52345);
+        assert_eq!(conn.remote_address, "172.217.14.99");
+        assert_eq!(conn.remote_port, 443);
+        assert_eq!(conn.state, "ESTABLISHED");
+    }
+
+    #[test]
+    fn test_get_hosts_parsing() {
+        // Test the parsing logic without actually reading /etc/hosts
+        let service = NetworkService::new();
+        let hosts = service.get_hosts();
+        // Should at least contain localhost entries on any macOS system
+        assert!(hosts.iter().any(|h| h.hostname == "localhost" || h.ip == "127.0.0.1"));
     }
 }

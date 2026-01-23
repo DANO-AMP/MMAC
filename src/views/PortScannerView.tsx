@@ -11,6 +11,7 @@ import {
   Code,
   Terminal,
 } from "lucide-react";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 interface PortInfo {
   port: number;
@@ -65,78 +66,18 @@ function PortScannerView() {
   const [isScanning, setIsScanning] = useState(false);
   const [selectedPort, setSelectedPort] = useState<PortInfo | null>(null);
   const [filter, setFilter] = useState<string>("all");
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [killError, setKillError] = useState<string | null>(null);
 
   const scanPorts = async () => {
     setIsScanning(true);
+    setScanError(null);
     try {
       const result: PortInfo[] = await invoke("scan_ports");
       setPorts(result);
     } catch (error) {
       console.error("Port scan error:", error);
-      // Demo data
-      setPorts([
-        {
-          port: 3000,
-          pid: 12345,
-          process_name: "node",
-          service_type: "HTTP Server",
-          protocol: "TCP",
-          local_address: "127.0.0.1",
-          working_dir: "/Users/me/projects/my-app",
-          command: "node ./node_modules/.bin/next dev",
-        },
-        {
-          port: 5173,
-          pid: 12567,
-          process_name: "node",
-          service_type: "Vite Dev Server",
-          protocol: "TCP",
-          local_address: "127.0.0.1",
-          working_dir: "/Users/me/projects/vite-app",
-          command: "vite",
-        },
-        {
-          port: 5432,
-          pid: 1234,
-          process_name: "postgres",
-          service_type: "PostgreSQL",
-          protocol: "TCP",
-          local_address: "127.0.0.1",
-        },
-        {
-          port: 6379,
-          pid: 2345,
-          process_name: "redis-server",
-          service_type: "Redis",
-          protocol: "TCP",
-          local_address: "127.0.0.1",
-        },
-        {
-          port: 8080,
-          pid: 3456,
-          process_name: "java",
-          service_type: "HTTP Server",
-          protocol: "TCP",
-          local_address: "0.0.0.0",
-        },
-        {
-          port: 8888,
-          pid: 4567,
-          process_name: "python3",
-          service_type: "Jupyter Notebook",
-          protocol: "TCP",
-          local_address: "127.0.0.1",
-          command: "python3 -m jupyter notebook",
-        },
-        {
-          port: 27017,
-          pid: 5678,
-          process_name: "mongod",
-          service_type: "MongoDB",
-          protocol: "TCP",
-          local_address: "127.0.0.1",
-        },
-      ]);
+      setScanError(error instanceof Error ? error.message : String(error));
     }
     setIsScanning(false);
   };
@@ -154,12 +95,14 @@ function PortScannerView() {
   };
 
   const stopProcess = async (pid: number) => {
+    setKillError(null);
     try {
       await invoke("kill_process", { pid });
       setPorts((prev) => prev.filter((p) => p.pid !== pid));
       setSelectedPort(null);
     } catch (error) {
       console.error("Failed to stop process:", error);
+      setKillError(error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -187,6 +130,22 @@ function PortScannerView() {
           <span>Escanear Puertos</span>
         </button>
       </div>
+
+      {/* Error banners */}
+      {scanError && (
+        <ErrorBanner
+          error={scanError}
+          onRetry={scanPorts}
+          className="mb-6"
+        />
+      )}
+      {killError && (
+        <ErrorBanner
+          error={killError}
+          onRetry={() => setKillError(null)}
+          className="mb-6"
+        />
+      )}
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6">

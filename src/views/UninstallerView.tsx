@@ -6,9 +6,10 @@ import {
   Trash2,
   FolderOpen,
   AlertCircle,
-  CheckCircle2,
   RefreshCw,
 } from "lucide-react";
+import { formatSize } from "../utils";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 interface AppInfo {
   name: string;
@@ -27,20 +28,14 @@ interface RemnantFile {
   type: string;
 }
 
-function formatSize(bytes: number): string {
-  if (!bytes || bytes <= 0 || !isFinite(bytes)) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-}
-
 function UninstallerView() {
   const [apps, setApps] = useState<AppInfo[]>([]);
   const [selectedApp, setSelectedApp] = useState<AppInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isUninstalling, setIsUninstalling] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [uninstallError, setUninstallError] = useState<string | null>(null);
 
   useEffect(() => {
     loadApps();
@@ -48,75 +43,13 @@ function UninstallerView() {
 
   const loadApps = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const result: AppInfo[] = await invoke("list_installed_apps");
       setApps(result);
     } catch (error) {
       console.error("Failed to load apps:", error);
-      // Demo data
-      setApps([
-        {
-          name: "Visual Studio Code",
-          bundle_id: "com.microsoft.VSCode",
-          path: "/Applications/Visual Studio Code.app",
-          size: 350 * 1024 * 1024,
-          version: "1.85.0",
-          remnants: [
-            { path: "~/Library/Application Support/Code", size: 150 * 1024 * 1024, type: "data" },
-            { path: "~/Library/Caches/com.microsoft.VSCode", size: 50 * 1024 * 1024, type: "cache" },
-            { path: "~/Library/Preferences/com.microsoft.VSCode.plist", size: 12 * 1024, type: "pref" },
-          ],
-          remnants_size: 200 * 1024 * 1024,
-        },
-        {
-          name: "Slack",
-          bundle_id: "com.tinyspeck.slackmacgap",
-          path: "/Applications/Slack.app",
-          size: 180 * 1024 * 1024,
-          version: "4.35.0",
-          remnants: [
-            { path: "~/Library/Application Support/Slack", size: 80 * 1024 * 1024, type: "data" },
-            { path: "~/Library/Caches/com.tinyspeck.slackmacgap", size: 25 * 1024 * 1024, type: "cache" },
-          ],
-          remnants_size: 105 * 1024 * 1024,
-        },
-        {
-          name: "Discord",
-          bundle_id: "com.hnc.Discord",
-          path: "/Applications/Discord.app",
-          size: 200 * 1024 * 1024,
-          version: "0.0.285",
-          remnants: [
-            { path: "~/Library/Application Support/discord", size: 120 * 1024 * 1024, type: "data" },
-            { path: "~/Library/Caches/com.hnc.Discord", size: 45 * 1024 * 1024, type: "cache" },
-          ],
-          remnants_size: 165 * 1024 * 1024,
-        },
-        {
-          name: "Spotify",
-          bundle_id: "com.spotify.client",
-          path: "/Applications/Spotify.app",
-          size: 150 * 1024 * 1024,
-          version: "1.2.25",
-          remnants: [
-            { path: "~/Library/Application Support/Spotify", size: 200 * 1024 * 1024, type: "data" },
-            { path: "~/Library/Caches/com.spotify.client", size: 80 * 1024 * 1024, type: "cache" },
-          ],
-          remnants_size: 280 * 1024 * 1024,
-        },
-        {
-          name: "Figma",
-          bundle_id: "com.figma.Desktop",
-          path: "/Applications/Figma.app",
-          size: 250 * 1024 * 1024,
-          version: "116.14.5",
-          remnants: [
-            { path: "~/Library/Application Support/Figma", size: 60 * 1024 * 1024, type: "data" },
-            { path: "~/Library/Caches/com.figma.Desktop", size: 30 * 1024 * 1024, type: "cache" },
-          ],
-          remnants_size: 90 * 1024 * 1024,
-        },
-      ]);
+      setLoadError(error instanceof Error ? error.message : String(error));
     }
     setIsLoading(false);
   };
@@ -125,6 +58,7 @@ function UninstallerView() {
     if (!selectedApp) return;
 
     setIsUninstalling(true);
+    setUninstallError(null);
     try {
       await invoke("uninstall_app", {
         bundleId: selectedApp.bundle_id,
@@ -134,6 +68,7 @@ function UninstallerView() {
       setSelectedApp(null);
     } catch (error) {
       console.error("Uninstall error:", error);
+      setUninstallError(error instanceof Error ? error.message : String(error));
     }
     setIsUninstalling(false);
   };
@@ -169,6 +104,22 @@ function UninstallerView() {
           <span>Actualizar</span>
         </button>
       </div>
+
+      {/* Error banners */}
+      {loadError && (
+        <ErrorBanner
+          error={loadError}
+          onRetry={loadApps}
+          className="mb-4"
+        />
+      )}
+      {uninstallError && (
+        <ErrorBanner
+          error={uninstallError}
+          onRetry={() => setUninstallError(null)}
+          className="mb-4"
+        />
+      )}
 
       {/* Search */}
       <div className="relative mb-4">

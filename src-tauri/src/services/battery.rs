@@ -155,4 +155,77 @@ impl BatteryService {
         }
         None
     }
+
+    /// Parse ioreg output for testing purposes.
+    /// Returns extracted values as a tuple: (is_charging, current_capacity, design_capacity, cycle_count, temperature)
+    #[cfg(test)]
+    pub fn parse_ioreg_output(&self, text: &str) -> Option<(bool, i64, i64, i64, i64)> {
+        if !text.contains("BatteryInstalled") || !text.contains("\"BatteryInstalled\" = Yes") {
+            return None;
+        }
+
+        let is_charging = self.extract_bool_value(text, "IsCharging");
+        let current_capacity = self.extract_int_value(text, "\"CurrentCapacity\"").unwrap_or(0);
+        let design_capacity = self.extract_int_value(text, "\"DesignCapacity\"").unwrap_or(0);
+        let cycle_count = self.extract_int_value(text, "\"CycleCount\"").unwrap_or(0);
+        let temperature = self.extract_int_value(text, "\"Temperature\"").unwrap_or(0);
+
+        Some((is_charging, current_capacity, design_capacity, cycle_count, temperature))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIXTURE: &str = include_str!("../../tests/fixtures/ioreg_battery.txt");
+
+    #[test]
+    fn test_parse_ioreg_battery_info() {
+        let service = BatteryService::new();
+        let result = service.parse_ioreg_output(FIXTURE);
+
+        assert!(result.is_some());
+        let (is_charging, current_capacity, design_capacity, cycle_count, temperature) = result.unwrap();
+
+        assert!(is_charging);
+        assert_eq!(current_capacity, 3840);
+        assert_eq!(design_capacity, 5103);
+        assert_eq!(cycle_count, 150);
+        assert_eq!(temperature, 2850);
+    }
+
+    #[test]
+    fn test_extract_bool_value() {
+        let service = BatteryService::new();
+
+        assert!(service.extract_bool_value(FIXTURE, "IsCharging"));
+        assert!(service.extract_bool_value(FIXTURE, "ExternalConnected"));
+        assert!(!service.extract_bool_value(FIXTURE, "FullyCharged"));
+    }
+
+    #[test]
+    fn test_extract_int_value() {
+        let service = BatteryService::new();
+
+        assert_eq!(service.extract_int_value(FIXTURE, "\"CycleCount\""), Some(150));
+        assert_eq!(service.extract_int_value(FIXTURE, "\"Voltage\""), Some(12500));
+        assert_eq!(service.extract_int_value(FIXTURE, "\"TimeRemaining\""), Some(180));
+    }
+
+    #[test]
+    fn test_temperature_conversion() {
+        // Temperature is in deciKelvin, test the conversion
+        let temp_raw = 2850i64;
+        let celsius = (temp_raw as f32 / 10.0) - 273.15;
+        assert!((celsius - 11.85).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_health_calculation() {
+        let max_capacity = 4800u32;
+        let design_capacity = 5103u32;
+        let health = (max_capacity as f32 / design_capacity as f32) * 100.0;
+        assert!((health - 94.08).abs() < 0.1);
+    }
 }

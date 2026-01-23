@@ -25,6 +25,8 @@ import DuplicatesView from "./views/DuplicatesView";
 import LargeFilesView from "./views/LargeFilesView";
 import BatteryView from "./views/BatteryView";
 import ConnectionsView from "./views/ConnectionsView";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { APP_VERSION } from "./constants/app";
 
 type View =
   | "cleaning"
@@ -129,7 +131,7 @@ function App() {
             </div>
             <div>
               <h1 className="font-bold text-sm">SysMac</h1>
-              <p className="text-xs text-gray-500">v0.2.0</p>
+              <p className="text-xs text-gray-500">v{APP_VERSION}</p>
             </div>
           </div>
         </div>
@@ -182,7 +184,9 @@ function App() {
       <main className="flex-1 overflow-auto flex flex-col">
         {/* Drag region for window */}
         <div className="h-8 flex-shrink-0 w-full" data-tauri-drag-region />
-        <div className="flex-1 overflow-auto">{renderView()}</div>
+        <div className="flex-1 overflow-auto">
+          <ErrorBoundary>{renderView()}</ErrorBoundary>
+        </div>
       </main>
     </div>
   );

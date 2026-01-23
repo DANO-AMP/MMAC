@@ -8,7 +8,10 @@ import {
   Info,
   ExternalLink,
   CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
+import { APP_VERSION, APP_NAME } from "../constants/app";
+import { useSettings, AppSettings } from "../contexts/SettingsContext";
 
 interface SettingSection {
   id: string;
@@ -17,16 +20,8 @@ interface SettingSection {
 }
 
 function SettingsView() {
+  const { settings, updateSettings, isLoading } = useSettings();
   const [activeSection, setActiveSection] = useState("general");
-  const [settings, setSettings] = useState({
-    theme: "dark",
-    notifications: true,
-    autoScan: false,
-    protectRecent: true,
-    recentDays: 7,
-    confirmDelete: true,
-    moveToTrash: true,
-  });
 
   const sections: SettingSection[] = [
     { id: "general", title: "General", icon: <Settings size={18} /> },
@@ -41,6 +36,22 @@ function SettingsView() {
     fullDiskAccess: true,
     notifications: true,
   });
+
+  const handleToggle = (key: keyof AppSettings, currentValue: boolean) => {
+    updateSettings({ [key]: !currentValue });
+  };
+
+  const handleNumberChange = (key: keyof AppSettings, value: number) => {
+    updateSettings({ [key]: value });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 h-full flex items-center justify-center">
+        <RefreshCw size={32} className="animate-spin text-primary-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 h-full flex">
@@ -81,9 +92,7 @@ function SettingsView() {
                     </p>
                   </div>
                   <button
-                    onClick={() =>
-                      setSettings((s) => ({ ...s, autoScan: !s.autoScan }))
-                    }
+                    onClick={() => handleToggle("autoScan", settings.autoScan)}
                     className={`w-12 h-6 rounded-full transition-colors ${
                       settings.autoScan ? "bg-primary-500" : "bg-dark-border"
                     }`}
@@ -106,9 +115,7 @@ function SettingsView() {
                     </p>
                   </div>
                   <button
-                    onClick={() =>
-                      setSettings((s) => ({ ...s, moveToTrash: !s.moveToTrash }))
-                    }
+                    onClick={() => handleToggle("moveToTrash", settings.moveToTrash)}
                     className={`w-12 h-6 rounded-full transition-colors ${
                       settings.moveToTrash ? "bg-primary-500" : "bg-dark-border"
                     }`}
@@ -131,12 +138,7 @@ function SettingsView() {
                     </p>
                   </div>
                   <button
-                    onClick={() =>
-                      setSettings((s) => ({
-                        ...s,
-                        confirmDelete: !s.confirmDelete,
-                      }))
-                    }
+                    onClick={() => handleToggle("confirmDelete", settings.confirmDelete)}
                     className={`w-12 h-6 rounded-full transition-colors ${
                       settings.confirmDelete ? "bg-primary-500" : "bg-dark-border"
                     }`}
@@ -161,12 +163,7 @@ function SettingsView() {
                     </p>
                   </div>
                   <button
-                    onClick={() =>
-                      setSettings((s) => ({
-                        ...s,
-                        protectRecent: !s.protectRecent,
-                      }))
-                    }
+                    onClick={() => handleToggle("protectRecent", settings.protectRecent)}
                     className={`w-12 h-6 rounded-full transition-colors ${
                       settings.protectRecent ? "bg-primary-500" : "bg-dark-border"
                     }`}
@@ -189,10 +186,7 @@ function SettingsView() {
                       type="number"
                       value={settings.recentDays}
                       onChange={(e) =>
-                        setSettings((s) => ({
-                          ...s,
-                          recentDays: parseInt(e.target.value) || 7,
-                        }))
+                        handleNumberChange("recentDays", parseInt(e.target.value) || 7)
                       }
                       className="w-20 mt-2 px-3 py-2 bg-dark-bg border border-dark-border rounded-lg focus:outline-none focus:border-primary-500"
                       min={1}
@@ -308,8 +302,8 @@ function SettingsView() {
               <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
                 <Settings size={40} className="text-white" />
               </div>
-              <h4 className="text-xl font-bold">SysMac</h4>
-              <p className="text-gray-400 mt-1">Version 0.1.0</p>
+              <h4 className="text-xl font-bold">{APP_NAME}</h4>
+              <p className="text-gray-400 mt-1">Version {APP_VERSION}</p>
 
               <div className="mt-6 pt-6 border-t border-dark-border">
                 <p className="text-sm text-gray-400">
@@ -338,7 +332,7 @@ function SettingsView() {
               <p className="font-medium mb-4">Tema</p>
               <div className="grid grid-cols-2 gap-4">
                 <button
-                  onClick={() => setSettings((s) => ({ ...s, theme: "dark" }))}
+                  onClick={() => updateSettings({ theme: "dark" })}
                   className={`p-4 rounded-xl border-2 transition-colors ${
                     settings.theme === "dark"
                       ? "border-primary-500 bg-primary-500/10"
@@ -349,7 +343,7 @@ function SettingsView() {
                   <p className="font-medium">Oscuro</p>
                 </button>
                 <button
-                  onClick={() => setSettings((s) => ({ ...s, theme: "light" }))}
+                  onClick={() => updateSettings({ theme: "light" })}
                   className={`p-4 rounded-xl border-2 transition-colors ${
                     settings.theme === "light"
                       ? "border-primary-500 bg-primary-500/10"
@@ -377,12 +371,7 @@ function SettingsView() {
                   </p>
                 </div>
                 <button
-                  onClick={() =>
-                    setSettings((s) => ({
-                      ...s,
-                      notifications: !s.notifications,
-                    }))
-                  }
+                  onClick={() => handleToggle("notifications", settings.notifications)}
                   className={`w-12 h-6 rounded-full transition-colors ${
                     settings.notifications ? "bg-primary-500" : "bg-dark-border"
                   }`}
