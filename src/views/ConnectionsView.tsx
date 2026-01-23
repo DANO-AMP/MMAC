@@ -7,6 +7,7 @@ import {
   Server,
   Trash2,
   FileText,
+  Zap,
 } from "lucide-react";
 
 interface NetworkConnection {
@@ -34,6 +35,7 @@ export default function ConnectionsView() {
   const [hosts, setHosts] = useState<HostEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [dnsMessage, setDnsMessage] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const loadConnections = async () => {
     setLoading(true);
@@ -79,6 +81,13 @@ export default function ConnectionsView() {
       loadHosts();
     }
   }, [activeTab]);
+
+  // Auto-refresh for connections
+  useEffect(() => {
+    if (!autoRefresh || activeTab !== "connections") return;
+    const interval = setInterval(loadConnections, 3000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, activeTab]);
 
   const getStateColor = (state: string) => {
     switch (state) {
@@ -149,7 +158,18 @@ export default function ConnectionsView() {
       {/* Connections Tab */}
       {activeTab === "connections" && (
         <div className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                autoRefresh
+                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                  : "bg-dark-card border border-dark-border text-gray-400 hover:text-white"
+              }`}
+            >
+              <Zap size={16} />
+              <span className="text-sm">Auto</span>
+            </button>
             <button
               onClick={loadConnections}
               disabled={loading}

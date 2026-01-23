@@ -10,6 +10,7 @@ import {
   Database,
   Code,
   Terminal,
+  Zap,
 } from "lucide-react";
 import { ErrorBanner } from "../components/ErrorBanner";
 
@@ -70,6 +71,7 @@ function PortScannerView() {
   const [filter, setFilter] = useState<string>("all");
   const [scanError, setScanError] = useState<string | null>(null);
   const [killError, setKillError] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
   const scanPorts = async () => {
     setIsScanning(true);
@@ -87,6 +89,13 @@ function PortScannerView() {
   useEffect(() => {
     scanPorts();
   }, []);
+
+  // Auto-refresh
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(scanPorts, 5000);
+    return () => clearInterval(interval);
+  }, [autoRefresh]);
 
   const openInBrowser = (port: number) => {
     window.open(`http://localhost:${port}`, "_blank");
@@ -123,14 +132,27 @@ function PortScannerView() {
             Detecta servicios web corriendo en tu Mac
           </p>
         </div>
-        <button
-          onClick={scanPorts}
-          disabled={isScanning}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={18} className={isScanning ? "animate-spin" : ""} />
-          <span>Escanear Puertos</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+              autoRefresh
+                ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                : "bg-dark-card border border-dark-border text-gray-400 hover:text-white"
+            }`}
+          >
+            <Zap size={16} />
+            <span className="text-sm">Auto</span>
+          </button>
+          <button
+            onClick={scanPorts}
+            disabled={isScanning}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={18} className={isScanning ? "animate-spin" : ""} />
+            <span>Escanear Puertos</span>
+          </button>
+        </div>
       </div>
 
       {/* Error banners */}
