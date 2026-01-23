@@ -68,6 +68,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     loadSettings();
   }, []);
 
+  // Apply theme to document
+  useEffect(() => {
+    const root = document.documentElement;
+    if (settings.theme === "dark") {
+      root.classList.add("dark");
+      root.classList.remove("light");
+    } else {
+      root.classList.add("light");
+      root.classList.remove("dark");
+    }
+  }, [settings.theme]);
+
   const updateSettings = async (updates: Partial<AppSettings>) => {
     const newSettings = { ...settings, ...updates };
     setSettings(newSettings);
