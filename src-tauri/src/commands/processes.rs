@@ -1,0 +1,14 @@
+use crate::services::processes::{ProcessInfo, ProcessService};
+use tauri::command;
+
+#[command]
+pub fn get_all_processes() -> Vec<ProcessInfo> {
+    let service = ProcessService::new();
+    service.get_all_processes()
+}
+
+#[command]
+pub fn kill_process_by_pid(pid: u32, force: bool) -> Result<(), String> {
+    let service = ProcessService::new();
+    service.kill_process(pid, force)
+}

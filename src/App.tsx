@@ -12,6 +12,7 @@ import {
   FileBox,
   Battery,
   Network,
+  Cpu,
 } from "lucide-react";
 import CleaningView from "./views/CleaningView";
 import UninstallerView from "./views/UninstallerView";
@@ -25,6 +26,7 @@ import DuplicatesView from "./views/DuplicatesView";
 import LargeFilesView from "./views/LargeFilesView";
 import BatteryView from "./views/BatteryView";
 import ConnectionsView from "./views/ConnectionsView";
+import ProcessesView from "./views/ProcessesView";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { APP_VERSION } from "./constants/app";
 
@@ -40,7 +42,8 @@ type View =
   | "duplicates"
   | "largefiles"
   | "battery"
-  | "connections";
+  | "connections"
+  | "processes";
 
 interface NavItem {
   id: View;
@@ -61,6 +64,7 @@ const navSections: NavSection[] = [
       { id: "uninstaller", label: "Desinstalar", icon: <AppWindow size={18} /> },
       { id: "startup", label: "Inicio", icon: <Rocket size={18} /> },
       { id: "monitor", label: "Monitor", icon: <Activity size={18} /> },
+      { id: "processes", label: "Procesos", icon: <Cpu size={18} /> },
       { id: "battery", label: "Batería", icon: <Battery size={18} /> },
     ],
   },
@@ -111,6 +115,8 @@ function App() {
         return <BatteryView />;
       case "connections":
         return <ConnectionsView />;
+      case "processes":
+        return <ProcessesView />;
       default:
         return <CleaningView />;
     }

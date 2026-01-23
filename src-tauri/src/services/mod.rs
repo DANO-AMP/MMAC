@@ -6,6 +6,7 @@ pub mod largefiles;
 pub mod memory;
 pub mod monitor;
 pub mod network;
+pub mod processes;
 pub mod projects;
 pub mod scanner;
 pub mod startup;

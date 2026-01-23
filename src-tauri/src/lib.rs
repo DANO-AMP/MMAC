@@ -3,7 +3,7 @@ mod services;
 
 use commands::{
     analyzer::*, battery::*, cleaning::*, duplicates::*, largefiles::*, memory::*, monitor::*,
-    network::*, ports::*, projects::*, startup::*, uninstaller::*,
+    network::*, ports::*, processes::*, projects::*, startup::*, uninstaller::*,
 };
 use commands::ports::ScannedPidsState;
 use services::monitor::MonitorService;
@@ -53,6 +53,9 @@ pub fn run() {
             get_active_connections,
             get_hosts,
             flush_dns,
+            // Processes
+            get_all_processes,
+            kill_process_by_pid,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
