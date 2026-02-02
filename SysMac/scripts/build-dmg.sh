@@ -82,72 +82,15 @@ PLIST
 # PkgInfo
 echo -n "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
 
-# Generate app icon using sips (macOS built-in)
-echo "[3/5] Generating app icon..."
-ICON_DIR="$BUILD_DIR/AppIcon.iconset"
-mkdir -p "$ICON_DIR"
-
-# Create a simple icon with a colored background using Python
-ICON_DIR="$ICON_DIR" python3 << 'PYEOF'
-import struct, zlib, os, sys
-
-def create_png(width, height, filepath):
-    """Create a simple gradient PNG icon."""
-    raw_data = b""
-    for y in range(height):
-        raw_data += b"\x00"  # filter byte
-        for x in range(width):
-            # Dark background with blue-purple gradient
-            r = int(30 + 40 * (x / width))
-            g = int(30 + 20 * (y / height))
-            b = int(80 + 120 * (x / width) * (1 - y / height))
-            a = 255
-            # Circle mask for rounded look
-            cx, cy = width / 2, height / 2
-            radius = width * 0.45
-            dist = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
-            if dist > radius:
-                a = max(0, int(255 * (1 - (dist - radius) / (width * 0.05))))
-            raw_data += struct.pack("BBBB", r, g, b, a)
-
-    def make_chunk(chunk_type, data):
-        chunk = chunk_type + data
-        return struct.pack(">I", len(data)) + chunk + struct.pack(">I", zlib.crc32(chunk) & 0xFFFFFFFF)
-
-    ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
-    png = b"\x89PNG\r\n\x1a\n"
-    png += make_chunk(b"IHDR", ihdr)
-    png += make_chunk(b"IDAT", zlib.compress(raw_data))
-    png += make_chunk(b"IEND", b"")
-
-    with open(filepath, "wb") as f:
-        f.write(png)
-
-icon_dir = os.environ.get("ICON_DIR", ".")
-sizes = [16, 32, 64, 128, 256, 512, 1024]
-for s in sizes:
-    create_png(s, s, os.path.join(icon_dir, f"icon_{s}x{s}.png"))
-    if s <= 512:
-        create_png(s * 2, s * 2, os.path.join(icon_dir, f"icon_{s}x{s}@2x.png"))
-PYEOF
-
-# Rename to iconset format
-cd "$ICON_DIR"
-mv icon_16x16.png icon_16x16.png 2>/dev/null || true
-mv icon_32x32.png icon_32x32.png 2>/dev/null || true
-mv icon_16x16@2x.png icon_16x16@2x.png 2>/dev/null || true
-mv icon_32x32@2x.png icon_32x32@2x.png 2>/dev/null || true
-mv icon_128x128.png icon_128x128.png 2>/dev/null || true
-mv icon_128x128@2x.png icon_128x128@2x.png 2>/dev/null || true
-mv icon_256x256.png icon_256x256.png 2>/dev/null || true
-mv icon_256x256@2x.png icon_256x256@2x.png 2>/dev/null || true
-mv icon_512x512.png icon_512x512.png 2>/dev/null || true
-mv icon_512x512@2x.png icon_512x512@2x.png 2>/dev/null || true
-
-# Convert to icns
-iconutil -c icns "$ICON_DIR" -o "$APP_BUNDLE/Contents/Resources/AppIcon.icns" 2>/dev/null || {
-    echo "  Warning: iconutil failed, app will use default icon"
-}
+# Copy app icon
+echo "[3/5] Adding app icon..."
+ICNS_SRC="$PROJECT_DIR/SysMac/Resources/AppIcon.icns"
+if [ -f "$ICNS_SRC" ]; then
+    cp "$ICNS_SRC" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+    echo "  Copied AppIcon.icns"
+else
+    echo "  Warning: AppIcon.icns not found, run scripts/generate-icon.py first"
+fi
 
 # Ad-hoc code signing
 echo "[4/5] Code signing (ad-hoc)..."
@@ -171,7 +114,7 @@ hdiutil create \
     -format UDZO \
     "$BUILD_DIR/$DMG_NAME" 2>&1 | tail -2
 
-rm -rf "$DMG_TEMP" "$ICON_DIR"
+rm -rf "$DMG_TEMP"
 
 echo ""
 echo "=== Build complete ==="
