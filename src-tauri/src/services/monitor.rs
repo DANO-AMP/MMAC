@@ -401,4 +401,407 @@ impl MonitorService {
             number as u32
         }
     }
+
+    /// Parse GPU info from system_profiler JSON output. Extracted for testability.
+    #[cfg(test)]
+    fn parse_gpu_json(&self, json: &serde_json::Value) -> Option<GpuInfo> {
+        let displays = json.get("SPDisplaysDataType")?.as_array()?;
+        let first_gpu = displays.first()?;
+
+        let name = first_gpu.get("sppci_model")
+            .or_else(|| first_gpu.get("_name"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "Unknown GPU".to_string());
+
+        let vendor = first_gpu.get("sppci_vendor")
+            .or_else(|| first_gpu.get("spdisplays_vendor"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let vram_str = first_gpu.get("sppci_vram")
+            .or_else(|| first_gpu.get("spdisplays_vram"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("0");
+
+        let vram_mb = self.parse_vram(vram_str);
+
+        let metal_support = first_gpu.get("spdisplays_metal")
+            .or_else(|| first_gpu.get("sppci_metal"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_lowercase().contains("supported") || s.to_lowercase().contains("yes"))
+            .unwrap_or(false);
+
+        Some(GpuInfo {
+            name,
+            vendor,
+            vram_mb,
+            metal_support,
+        })
+    }
+
+    /// Parse fan speed from ioreg output. Extracted for testability.
+    #[cfg(test)]
+    fn parse_fan_speed_output(&self, output: &str) -> Option<u32> {
+        for line in output.lines() {
+            if line.contains("FanSpeed") || line.contains("Fan Speed") {
+                if let Some(num) = line.split('=').nth(1) {
+                    let cleaned = num.trim().trim_matches(|c| c == '"' || c == ' ');
+                    if let Ok(speed) = cleaned.parse::<u32>() {
+                        return Some(speed);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Parse iostat output for disk I/O. Extracted for testability.
+    #[cfg(test)]
+    fn parse_iostat_output(&self, output: &str) -> (u64, u64) {
+        let lines: Vec<&str> = output.lines().collect();
+        if lines.len() >= 3 {
+            let data_line = lines.get(2).or_else(|| lines.last()).unwrap_or(&"");
+            let parts: Vec<&str> = data_line.split_whitespace().collect();
+            if parts.len() >= 3 {
+                if let Ok(mb_per_sec) = parts[2].parse::<f64>() {
+                    let bytes_per_sec = (mb_per_sec * 1024.0 * 1024.0) as u64;
+                    return (bytes_per_sec / 2, bytes_per_sec / 2);
+                }
+            }
+        }
+        (0, 0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // ---- Struct serialization tests ----
+
+    #[test]
+    fn test_system_stats_serialization_roundtrip() {
+        let stats = SystemStats {
+            cpu_usage: 45.5,
+            memory_used: 8_589_934_592,
+            memory_total: 17_179_869_184,
+            disk_used: 250_000_000_000,
+            disk_total: 500_000_000_000,
+            network_rx: 1024,
+            network_tx: 512,
+            cpu_temp: 52.3,
+            fan_speed: Some(2000),
+            disk_read_speed: 100_000,
+            disk_write_speed: 50_000,
+            gpu_name: Some("Apple M1 Pro".to_string()),
+            gpu_vendor: Some("Apple".to_string()),
+        };
+
+        let json = serde_json::to_string(&stats).expect("serialize");
+        let deserialized: SystemStats = serde_json::from_str(&json).expect("deserialize");
+
+        assert!((deserialized.cpu_usage - 45.5).abs() < f32::EPSILON);
+        assert_eq!(deserialized.memory_used, 8_589_934_592);
+        assert_eq!(deserialized.memory_total, 17_179_869_184);
+        assert_eq!(deserialized.disk_used, 250_000_000_000);
+        assert_eq!(deserialized.disk_total, 500_000_000_000);
+        assert_eq!(deserialized.network_rx, 1024);
+        assert_eq!(deserialized.network_tx, 512);
+        assert_eq!(deserialized.fan_speed, Some(2000));
+        assert_eq!(deserialized.gpu_name, Some("Apple M1 Pro".to_string()));
+        assert_eq!(deserialized.gpu_vendor, Some("Apple".to_string()));
+    }
+
+    #[test]
+    fn test_system_stats_serialization_with_none_fields() {
+        let stats = SystemStats {
+            cpu_usage: 0.0,
+            memory_used: 0,
+            memory_total: 0,
+            disk_used: 0,
+            disk_total: 0,
+            network_rx: 0,
+            network_tx: 0,
+            cpu_temp: 0.0,
+            fan_speed: None,
+            disk_read_speed: 0,
+            disk_write_speed: 0,
+            gpu_name: None,
+            gpu_vendor: None,
+        };
+
+        let json = serde_json::to_string(&stats).expect("serialize");
+        let deserialized: SystemStats = serde_json::from_str(&json).expect("deserialize");
+
+        assert_eq!(deserialized.fan_speed, None);
+        assert_eq!(deserialized.gpu_name, None);
+        assert_eq!(deserialized.gpu_vendor, None);
+    }
+
+    #[test]
+    fn test_gpu_info_serialization_roundtrip() {
+        let info = GpuInfo {
+            name: "Apple M2 Max".to_string(),
+            vendor: "Apple".to_string(),
+            vram_mb: 32768,
+            metal_support: true,
+        };
+
+        let json = serde_json::to_string(&info).expect("serialize");
+        let deserialized: GpuInfo = serde_json::from_str(&json).expect("deserialize");
+
+        assert_eq!(deserialized.name, "Apple M2 Max");
+        assert_eq!(deserialized.vendor, "Apple");
+        assert_eq!(deserialized.vram_mb, 32768);
+        assert!(deserialized.metal_support);
+    }
+
+    // ---- parse_vram tests ----
+
+    #[test]
+    fn test_parse_vram_megabytes() {
+        let service = MonitorService::new();
+        assert_eq!(service.parse_vram("1536 MB"), 1536);
+    }
+
+    #[test]
+    fn test_parse_vram_gigabytes() {
+        let service = MonitorService::new();
+        assert_eq!(service.parse_vram("8 GB"), 8192);
+    }
+
+    #[test]
+    fn test_parse_vram_gigabytes_decimal() {
+        let service = MonitorService::new();
+        assert_eq!(service.parse_vram("1.5 GB"), 1536);
+    }
+
+    #[test]
+    fn test_parse_vram_zero() {
+        let service = MonitorService::new();
+        assert_eq!(service.parse_vram("0"), 0);
+    }
+
+    #[test]
+    fn test_parse_vram_empty_string() {
+        let service = MonitorService::new();
+        assert_eq!(service.parse_vram(""), 0);
+    }
+
+    #[test]
+    fn test_parse_vram_no_unit() {
+        let service = MonitorService::new();
+        // No unit marker, treated as MB
+        assert_eq!(service.parse_vram("2048"), 2048);
+    }
+
+    #[test]
+    fn test_parse_vram_case_insensitive() {
+        let service = MonitorService::new();
+        assert_eq!(service.parse_vram("4 gb"), 4096);
+        assert_eq!(service.parse_vram("4 GB"), 4096);
+        assert_eq!(service.parse_vram("4 Gb"), 4096);
+    }
+
+    #[test]
+    fn test_parse_vram_non_numeric_string() {
+        let service = MonitorService::new();
+        assert_eq!(service.parse_vram("not a number"), 0);
+    }
+
+    // ---- parse_gpu_json tests ----
+
+    #[test]
+    fn test_parse_gpu_json_apple_silicon() {
+        let service = MonitorService::new();
+        let json = json!({
+            "SPDisplaysDataType": [{
+                "sppci_model": "Apple M1 Pro",
+                "sppci_vendor": "sppci_vendor_Apple",
+                "sppci_vram": "16 GB",
+                "spdisplays_metal": "spdisplays_metal_supported"
+            }]
+        });
+
+        let gpu = service.parse_gpu_json(&json).expect("should parse GPU");
+        assert_eq!(gpu.name, "Apple M1 Pro");
+        assert_eq!(gpu.vendor, "sppci_vendor_Apple");
+        assert_eq!(gpu.vram_mb, 16384);
+        assert!(gpu.metal_support);
+    }
+
+    #[test]
+    fn test_parse_gpu_json_fallback_name_key() {
+        let service = MonitorService::new();
+        let json = json!({
+            "SPDisplaysDataType": [{
+                "_name": "AMD Radeon Pro 5500M",
+                "spdisplays_vendor": "AMD",
+                "spdisplays_vram": "8 GB",
+                "sppci_metal": "Yes"
+            }]
+        });
+
+        let gpu = service.parse_gpu_json(&json).expect("should parse GPU");
+        assert_eq!(gpu.name, "AMD Radeon Pro 5500M");
+        assert_eq!(gpu.vendor, "AMD");
+        assert_eq!(gpu.vram_mb, 8192);
+        assert!(gpu.metal_support);
+    }
+
+    #[test]
+    fn test_parse_gpu_json_no_metal() {
+        let service = MonitorService::new();
+        let json = json!({
+            "SPDisplaysDataType": [{
+                "sppci_model": "Intel HD 4000",
+                "sppci_vendor": "Intel"
+            }]
+        });
+
+        let gpu = service.parse_gpu_json(&json).expect("should parse GPU");
+        assert_eq!(gpu.name, "Intel HD 4000");
+        assert!(!gpu.metal_support);
+        assert_eq!(gpu.vram_mb, 0);
+    }
+
+    #[test]
+    fn test_parse_gpu_json_missing_data() {
+        let service = MonitorService::new();
+        let json = json!({});
+        assert!(service.parse_gpu_json(&json).is_none());
+    }
+
+    #[test]
+    fn test_parse_gpu_json_empty_array() {
+        let service = MonitorService::new();
+        let json = json!({ "SPDisplaysDataType": [] });
+        assert!(service.parse_gpu_json(&json).is_none());
+    }
+
+    #[test]
+    fn test_parse_gpu_json_defaults_unknown() {
+        let service = MonitorService::new();
+        let json = json!({
+            "SPDisplaysDataType": [{}]
+        });
+
+        let gpu = service.parse_gpu_json(&json).expect("should parse");
+        assert_eq!(gpu.name, "Unknown GPU");
+        assert_eq!(gpu.vendor, "Unknown");
+        assert_eq!(gpu.vram_mb, 0);
+        assert!(!gpu.metal_support);
+    }
+
+    // ---- parse_fan_speed_output tests ----
+
+    #[test]
+    fn test_parse_fan_speed_output_found() {
+        let service = MonitorService::new();
+        let output = r#"
+        +-o AppleSMCLMU  <class AppleSMCLMU>
+          | {
+          |   "FanSpeed" = 1800
+          | }
+        "#;
+
+        assert_eq!(service.parse_fan_speed_output(output), Some(1800));
+    }
+
+    #[test]
+    fn test_parse_fan_speed_output_with_quoted_value() {
+        let service = MonitorService::new();
+        let output = r#""FanSpeed" = "2200""#;
+
+        assert_eq!(service.parse_fan_speed_output(output), Some(2200));
+    }
+
+    #[test]
+    fn test_parse_fan_speed_output_fan_speed_variant() {
+        let service = MonitorService::new();
+        let output = "Fan Speed = 1500";
+
+        assert_eq!(service.parse_fan_speed_output(output), Some(1500));
+    }
+
+    #[test]
+    fn test_parse_fan_speed_output_no_match() {
+        let service = MonitorService::new();
+        let output = "no fan info here";
+
+        assert_eq!(service.parse_fan_speed_output(output), None);
+    }
+
+    #[test]
+    fn test_parse_fan_speed_output_empty() {
+        let service = MonitorService::new();
+        assert_eq!(service.parse_fan_speed_output(""), None);
+    }
+
+    #[test]
+    fn test_parse_fan_speed_output_non_numeric_value() {
+        let service = MonitorService::new();
+        let output = "FanSpeed = not_a_number";
+
+        assert_eq!(service.parse_fan_speed_output(output), None);
+    }
+
+    // ---- parse_iostat_output tests ----
+
+    #[test]
+    fn test_parse_iostat_output_normal() {
+        let service = MonitorService::new();
+        let output = "              disk0\n    KB/t  tps  MB/s\n   45.12  120  5.50";
+
+        let (read, write) = service.parse_iostat_output(output);
+        let expected_total = (5.50 * 1024.0 * 1024.0) as u64;
+        assert_eq!(read, expected_total / 2);
+        assert_eq!(write, expected_total / 2);
+    }
+
+    #[test]
+    fn test_parse_iostat_output_zero() {
+        let service = MonitorService::new();
+        let output = "              disk0\n    KB/t  tps  MB/s\n   0.00  0  0.00";
+
+        let (read, write) = service.parse_iostat_output(output);
+        assert_eq!(read, 0);
+        assert_eq!(write, 0);
+    }
+
+    #[test]
+    fn test_parse_iostat_output_empty() {
+        let service = MonitorService::new();
+        let (read, write) = service.parse_iostat_output("");
+        assert_eq!(read, 0);
+        assert_eq!(write, 0);
+    }
+
+    #[test]
+    fn test_parse_iostat_output_insufficient_lines() {
+        let service = MonitorService::new();
+        let (read, write) = service.parse_iostat_output("only one line");
+        assert_eq!(read, 0);
+        assert_eq!(write, 0);
+    }
+
+    #[test]
+    fn test_parse_iostat_output_malformed_data() {
+        let service = MonitorService::new();
+        let output = "header\nsubheader\nnot numbers here";
+        let (read, write) = service.parse_iostat_output(output);
+        assert_eq!(read, 0);
+        assert_eq!(write, 0);
+    }
+
+    // ---- MonitorService constructor test ----
+
+    #[test]
+    fn test_monitor_service_new() {
+        // Verify the service can be constructed without panic
+        let _service = MonitorService::new();
+    }
 }

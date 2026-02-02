@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Shield,
@@ -146,23 +146,25 @@ function FirewallView() {
     }
   };
 
-  const filteredConnections = connections.filter(proc => {
-    const matchesSearch =
-      proc.process_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      proc.connections.some(c =>
-        c.remote_host.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+  const filteredConnections = useMemo(() => {
+    return connections.filter(proc => {
+      const matchesSearch =
+        proc.process_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        proc.connections.some(c =>
+          c.remote_host.toLowerCase().includes(searchQuery.toLowerCase())
+        );
 
-    const matchesFilter =
-      filter === "all" ||
-      proc.connections.some(c =>
-        filter === "established"
-          ? c.connection_state === "ESTABLISHED"
-          : c.connection_state === "LISTEN"
-      );
+      const matchesFilter =
+        filter === "all" ||
+        proc.connections.some(c =>
+          filter === "established"
+            ? c.connection_state === "ESTABLISHED"
+            : c.connection_state === "LISTEN"
+        );
 
-    return matchesSearch && matchesFilter;
-  });
+      return matchesSearch && matchesFilter;
+    });
+  }, [connections, searchQuery, filter]);
 
   const totalConnections = connections.reduce((acc, p) => acc + p.connection_count, 0);
   const establishedCount = connections.reduce(

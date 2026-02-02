@@ -1,29 +1,13 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FileBox, Search, Trash2, FolderOpen, RefreshCw } from "lucide-react";
+import { formatSize, formatDate } from "../utils/format";
 
 interface LargeFile {
   path: string;
   name: string;
   size: number;
   modified: number;
-}
-
-function formatSize(bytes: number): string {
-  if (!bytes || bytes <= 0 || !isFinite(bytes)) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-}
-
-function formatDate(timestamp: number): string {
-  if (!timestamp) return "-";
-  return new Date(timestamp * 1000).toLocaleDateString("es-ES", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 export default function LargeFilesView() {
@@ -190,7 +174,7 @@ export default function LargeFilesView() {
                       {formatSize(file.size)}
                     </td>
                     <td className="px-4 py-3 text-right text-gray-400">
-                      {formatDate(file.modified)}
+                      {formatDate(file.modified * 1000)}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">

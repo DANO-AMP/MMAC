@@ -10,6 +10,7 @@ import {
   Package,
   Box,
 } from "lucide-react";
+import { formatSize } from "../utils/format";
 
 interface ProjectArtifact {
   project_path: string;
@@ -27,14 +28,6 @@ interface ArtifactSummary {
   total_size: number;
   icon: React.ReactNode;
   color: string;
-}
-
-function formatSize(bytes: number): string {
-  if (!bytes || bytes <= 0 || !isFinite(bytes)) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
 function formatDate(dateStr: string): string {

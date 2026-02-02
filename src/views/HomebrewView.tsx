@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Package,
@@ -180,15 +180,17 @@ function HomebrewView() {
     }
   };
 
-  const filteredPackages = packages.filter(pkg => {
-    const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "formulae" && !pkg.is_cask) ||
-      (filter === "casks" && pkg.is_cask) ||
-      (filter === "outdated" && pkg.is_outdated);
-    return matchesSearch && matchesFilter;
-  });
+  const filteredPackages = useMemo(() => {
+    return packages.filter(pkg => {
+      const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFilter =
+        filter === "all" ||
+        (filter === "formulae" && !pkg.is_cask) ||
+        (filter === "casks" && pkg.is_cask) ||
+        (filter === "outdated" && pkg.is_outdated);
+      return matchesSearch && matchesFilter;
+    });
+  }, [packages, searchQuery, filter]);
 
   if (isLoading) {
     return (

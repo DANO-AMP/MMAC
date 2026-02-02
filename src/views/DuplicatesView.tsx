@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, Search, Trash2, FolderOpen, RefreshCw } from "lucide-react";
+import { formatSize } from "../utils/format";
 
 interface DuplicateGroup {
   hash: string;
@@ -12,14 +13,6 @@ interface DuplicateScanResult {
   groups: DuplicateGroup[];
   total_wasted: number;
   files_scanned: number;
-}
-
-function formatSize(bytes: number): string {
-  if (!bytes || bytes <= 0 || !isFinite(bytes)) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
 export default function DuplicatesView() {

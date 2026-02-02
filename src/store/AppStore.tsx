@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useReducer, useCallback, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
+// Refresh interval constants
+const REFRESH_INTERVAL_REALTIME = 2000;   // 2s for system stats
+const REFRESH_INTERVAL_FAST = 3000;       // 3s for processes
+const REFRESH_INTERVAL_MEDIUM = 5000;     // 5s for connections/ports
+const REFRESH_INTERVAL_SLOW = 10000;      // 10s for battery/bluetooth
+
 // Types for all cacheable data
 export interface SystemStats {
   cpu_usage: number;
@@ -249,9 +255,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const intervalsRef = useRef<{ [key: string]: ReturnType<typeof setInterval> }>({});
 
-  // Refresh functions
+  // Use refs for latest state to avoid stale closures
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  // Refresh functions - use refs to avoid stale closures
   const refreshSystemStats = useCallback(async () => {
-    if (state.systemStats.isLoading) return;
+    if (stateRef.current.systemStats.isLoading) return;
     dispatch({ type: "SET_SYSTEM_STATS_LOADING", payload: true });
     try {
       const result = await invoke<SystemStats>("get_system_stats");
@@ -259,10 +271,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       dispatch({ type: "SET_SYSTEM_STATS_ERROR", payload: String(err) });
     }
-  }, [state.systemStats.isLoading]);
+  }, []); // No deps needed - uses ref
 
   const refreshProcesses = useCallback(async () => {
-    if (state.processes.isLoading) return;
+    if (stateRef.current.processes.isLoading) return;
     dispatch({ type: "SET_PROCESSES_LOADING", payload: true });
     try {
       const result = await invoke<ProcessInfo[]>("get_all_processes");
@@ -270,10 +282,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       dispatch({ type: "SET_PROCESSES_ERROR", payload: String(err) });
     }
-  }, [state.processes.isLoading]);
+  }, []); // No deps needed - uses ref
 
   const refreshConnections = useCallback(async () => {
-    if (state.connections.isLoading) return;
+    if (stateRef.current.connections.isLoading) return;
     dispatch({ type: "SET_CONNECTIONS_LOADING", payload: true });
     try {
       const result = await invoke<ConnectionInfo[]>("get_active_connections");
@@ -281,10 +293,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       dispatch({ type: "SET_CONNECTIONS_ERROR", payload: String(err) });
     }
-  }, [state.connections.isLoading]);
+  }, []); // No deps needed - uses ref
 
   const refreshPorts = useCallback(async () => {
-    if (state.ports.isLoading) return;
+    if (stateRef.current.ports.isLoading) return;
     dispatch({ type: "SET_PORTS_LOADING", payload: true });
     try {
       const result = await invoke<PortInfo[]>("scan_ports");
@@ -292,10 +304,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       dispatch({ type: "SET_PORTS_ERROR", payload: String(err) });
     }
-  }, [state.ports.isLoading]);
+  }, []); // No deps needed - uses ref
 
   const refreshBattery = useCallback(async () => {
-    if (state.battery.isLoading) return;
+    if (stateRef.current.battery.isLoading) return;
     dispatch({ type: "SET_BATTERY_LOADING", payload: true });
     try {
       const result = await invoke<BatteryInfo>("get_battery_info");
@@ -303,10 +315,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       dispatch({ type: "SET_BATTERY_ERROR", payload: String(err) });
     }
-  }, [state.battery.isLoading]);
+  }, []); // No deps needed - uses ref
 
   const refreshBluetooth = useCallback(async () => {
-    if (state.bluetooth.isLoading) return;
+    if (stateRef.current.bluetooth.isLoading) return;
     dispatch({ type: "SET_BLUETOOTH_LOADING", payload: true });
     try {
       const result = await invoke<BluetoothInfo>("get_bluetooth_info");
@@ -314,7 +326,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       dispatch({ type: "SET_BLUETOOTH_ERROR", payload: String(err) });
     }
-  }, [state.bluetooth.isLoading]);
+  }, []); // No deps needed - uses ref
 
   const refreshAll = useCallback(async () => {
     await Promise.all([
@@ -331,6 +343,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "SET_BACKGROUND_REFRESH", payload: enabled });
   }, []);
 
+  // Keep refs to refresh functions for intervals
+  const refreshFnsRef = useRef({
+    refreshSystemStats,
+    refreshProcesses,
+    refreshConnections,
+    refreshPorts,
+    refreshBattery,
+    refreshBluetooth
+  });
+
+  useEffect(() => {
+    refreshFnsRef.current = {
+      refreshSystemStats,
+      refreshProcesses,
+      refreshConnections,
+      refreshPorts,
+      refreshBattery,
+      refreshBluetooth
+    };
+  });
+
   // Background refresh effect
   useEffect(() => {
     if (!state.isBackgroundRefreshEnabled) {
@@ -341,32 +374,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Initial fetch
-    refreshSystemStats();
-    refreshProcesses();
-    refreshBattery();
-    refreshBluetooth();
+    refreshFnsRef.current.refreshSystemStats();
+    refreshFnsRef.current.refreshProcesses();
+    refreshFnsRef.current.refreshBattery();
+    refreshFnsRef.current.refreshBluetooth();
 
     // Slower initial fetch for network-heavy operations
     setTimeout(() => {
-      refreshConnections();
-      refreshPorts();
+      refreshFnsRef.current.refreshConnections();
+      refreshFnsRef.current.refreshPorts();
     }, 500);
 
-    // Set up intervals - real-time data (2s)
-    intervalsRef.current.systemStats = setInterval(refreshSystemStats, 2000);
-    intervalsRef.current.processes = setInterval(refreshProcesses, 3000);
+    // Set up intervals - real-time data
+    intervalsRef.current.systemStats = setInterval(() => refreshFnsRef.current.refreshSystemStats(), REFRESH_INTERVAL_REALTIME);
+    intervalsRef.current.processes = setInterval(() => refreshFnsRef.current.refreshProcesses(), REFRESH_INTERVAL_FAST);
 
-    // Semi-real-time data (5s)
-    intervalsRef.current.connections = setInterval(refreshConnections, 5000);
-    intervalsRef.current.ports = setInterval(refreshPorts, 5000);
-    intervalsRef.current.battery = setInterval(refreshBattery, 10000);
-    intervalsRef.current.bluetooth = setInterval(refreshBluetooth, 10000);
+    // Semi-real-time data
+    intervalsRef.current.connections = setInterval(() => refreshFnsRef.current.refreshConnections(), REFRESH_INTERVAL_MEDIUM);
+    intervalsRef.current.ports = setInterval(() => refreshFnsRef.current.refreshPorts(), REFRESH_INTERVAL_MEDIUM);
+    intervalsRef.current.battery = setInterval(() => refreshFnsRef.current.refreshBattery(), REFRESH_INTERVAL_SLOW);
+    intervalsRef.current.bluetooth = setInterval(() => refreshFnsRef.current.refreshBluetooth(), REFRESH_INTERVAL_SLOW);
 
     return () => {
       Object.values(intervalsRef.current).forEach(clearInterval);
       intervalsRef.current = {};
     };
-  }, [state.isBackgroundRefreshEnabled]);
+  }, [state.isBackgroundRefreshEnabled]); // Now correct - only depends on the toggle
 
   const value: AppContextValue = {
     state,

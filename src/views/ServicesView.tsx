@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Settings2,
@@ -126,6 +126,41 @@ function ServicesView() {
     }
   };
 
+  // Focus trap and keyboard handling for modal
+  useEffect(() => {
+    if (!serviceInfo) return;
+
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+    if (!dialog) return;
+
+    const focusableElements = dialog.querySelectorAll('button, [tabindex]:not([tabindex="-1"])');
+    const firstEl = focusableElements[0] as HTMLElement;
+    const lastEl = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+    // Focus first element when modal opens
+    firstEl?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setServiceInfo(null);
+        setSelectedService(null);
+        return;
+      }
+      if (e.key === 'Tab') {
+        if (e.shiftKey && document.activeElement === firstEl) {
+          e.preventDefault();
+          lastEl?.focus();
+        } else if (!e.shiftKey && document.activeElement === lastEl) {
+          e.preventDefault();
+          firstEl?.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [serviceInfo]);
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "running":
@@ -152,17 +187,21 @@ function ServicesView() {
     }
   };
 
-  const allServices = services
-    ? [...services.user_agents, ...services.user_daemons, ...services.system_agents]
-    : [];
+  const allServices = useMemo(() => {
+    return services
+      ? [...services.user_agents, ...services.user_daemons, ...services.system_agents]
+      : [];
+  }, [services]);
 
-  const filteredServices = allServices.filter(service => {
-    const matchesSearch = service.label.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      filter === "all" ||
-      service.status === filter;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredServices = useMemo(() => {
+    return allServices.filter(service => {
+      const matchesSearch = service.label.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFilter =
+        filter === "all" ||
+        service.status === filter;
+      return matchesSearch && matchesFilter;
+    });
+  }, [allServices, searchQuery, filter]);
 
   const runningCount = allServices.filter(s => s.status === "running").length;
   const stoppedCount = allServices.filter(s => s.status === "stopped").length;

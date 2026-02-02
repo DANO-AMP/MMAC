@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   FileQuestion,
@@ -179,16 +179,18 @@ function OrphanedView() {
     loadData(true);
   };
 
-  const filteredFiles = (scanResult?.files || []).filter(file => {
-    const matchesSearch =
-      file.likely_app.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      file.path.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      filter === "all" ||
-      file.file_type === filter ||
-      (filter === "container" && file.file_type.includes("container"));
-    return matchesSearch && matchesFilter;
-  });
+  const filteredFiles = useMemo(() => {
+    return (scanResult?.files || []).filter(file => {
+      const matchesSearch =
+        file.likely_app.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        file.path.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFilter =
+        filter === "all" ||
+        file.file_type === filter ||
+        (filter === "container" && file.file_type.includes("container"));
+      return matchesSearch && matchesFilter;
+    });
+  }, [scanResult?.files, searchQuery, filter]);
 
   const selectedSize = filteredFiles
     .filter(f => selectedFiles.has(f.path))

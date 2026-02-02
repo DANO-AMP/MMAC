@@ -75,7 +75,7 @@ export default function ConnectionsView() {
 
     loadHostsData();
     return () => { isMounted = false; };
-  }, [activeTab, hosts.length]);
+  }, [activeTab]); // Fixed: removed hosts.length dependency
 
   const getStateColor = (state: string) => {
     switch (state) {
