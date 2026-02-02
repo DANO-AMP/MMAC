@@ -25,5 +25,9 @@ npm-debug.log*
 # Tauri generated
 src-tauri/gen/
 
+# Swift build artifacts
+SysMac/.build/
+
 # Claude Code
 .claude/logs/
+SysMac/.claude/
