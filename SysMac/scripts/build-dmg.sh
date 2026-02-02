@@ -88,7 +88,7 @@ ICON_DIR="$BUILD_DIR/AppIcon.iconset"
 mkdir -p "$ICON_DIR"
 
 # Create a simple icon with a colored background using Python
-python3 << 'PYEOF'
+ICON_DIR="$ICON_DIR" python3 << 'PYEOF'
 import struct, zlib, os, sys
 
 def create_png(width, height, filepath):

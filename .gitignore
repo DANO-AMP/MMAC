@@ -27,6 +27,7 @@ src-tauri/gen/
 
 # Swift build artifacts
 SysMac/.build/
+SysMac/dist/
 
 # Claude Code
 .claude/logs/
