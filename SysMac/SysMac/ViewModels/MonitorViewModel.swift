@@ -2,7 +2,7 @@ import Foundation
 
 struct ChartDataPoint: Identifiable {
     let id = UUID()
-    let time: String
+    let time: Date
     let cpu: Double
     let memory: Double
     let networkRx: UInt64
@@ -43,10 +43,6 @@ final class MonitorViewModel: ObservableObject {
         stats = newStats
 
         if isLive {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm:ss"
-            let timeStr = formatter.string(from: Date())
-
             let memPercent: Double
             if newStats.memoryTotal > 0 {
                 memPercent = Double(newStats.memoryUsed) / Double(newStats.memoryTotal) * 100.0
@@ -55,7 +51,7 @@ final class MonitorViewModel: ObservableObject {
             }
 
             let point = ChartDataPoint(
-                time: timeStr,
+                time: Date(),
                 cpu: Double(newStats.cpuUsage),
                 memory: memPercent,
                 networkRx: newStats.networkRx,

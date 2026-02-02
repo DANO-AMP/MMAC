@@ -23,13 +23,14 @@ enum ShellHelper {
 
         do {
             try process.run()
-            process.waitUntilExit()
         } catch {
             return ("", "Failed to run \(command): \(error.localizedDescription)", -1)
         }
 
+        // Read pipes BEFORE waitUntilExit to avoid deadlock when output exceeds pipe buffer
         let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
         let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
 
         let output = String(data: outputData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let errorOutput = String(data: errorData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""

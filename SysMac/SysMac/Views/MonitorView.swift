@@ -143,9 +143,13 @@ struct MonitorView: View {
                 }
                 .chartYScale(domain: 0...100)
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                        AxisValueLabel()
-                            .font(.caption2)
+                    AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                        AxisValueLabel {
+                            if let date = value.as(Date.self) {
+                                Text(date, format: .dateTime.hour().minute().second())
+                                    .font(.caption2)
+                            }
+                        }
                     }
                 }
                 .frame(height: 180)
@@ -166,9 +170,13 @@ struct MonitorView: View {
                 }
                 .chartYScale(domain: 0...100)
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                        AxisValueLabel()
-                            .font(.caption2)
+                    AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                        AxisValueLabel {
+                            if let date = value.as(Date.self) {
+                                Text(date, format: .dateTime.hour().minute().second())
+                                    .font(.caption2)
+                            }
+                        }
                     }
                 }
                 .frame(height: 180)
