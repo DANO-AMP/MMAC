@@ -1,8 +1,0 @@
-COMMAND     PID USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
-node      12345 user   23u  IPv4 0x1234567890abcdef      0t0  TCP 127.0.0.1:3000 (LISTEN)
-node      12567 user   24u  IPv4 0x1234567890abcde0      0t0  TCP 127.0.0.1:5173 (LISTEN)
-postgres   1234 user   10u  IPv4 0x1234567890abcde1      0t0  TCP 127.0.0.1:5432 (LISTEN)
-redis-ser  2345 user    6u  IPv4 0x1234567890abcde2      0t0  TCP 127.0.0.1:6379 (LISTEN)
-java       3456 user   45u  IPv4 0x1234567890abcde3      0t0  TCP *:8080 (LISTEN)
-python3    4567 user   12u  IPv6 0x1234567890abcde4      0t0  TCP [::1]:8888 (LISTEN)
-mongod     5678 user   11u  IPv4 0x1234567890abcde5      0t0  TCP 127.0.0.1:27017 (LISTEN)
