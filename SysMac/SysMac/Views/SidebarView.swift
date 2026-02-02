@@ -53,7 +53,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .cleaning: return "sparkles"
         case .uninstaller: return "macwindow"
-        case .startup: return "rocket"
+        case .startup: return "bolt.circle"
         case .monitor: return "waveform.path.ecg"
         case .processes: return "cpu"
         case .memory: return "memorychip"
@@ -65,7 +65,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .duplicates: return "doc.on.doc"
         case .projects: return "folder"
         case .orphaned: return "questionmark.folder"
-        case .homebrew: return "mug"
+        case .homebrew: return "cup.and.saucer"
         case .ports: return "globe"
         case .connections: return "network"
         case .firewall: return "shield"

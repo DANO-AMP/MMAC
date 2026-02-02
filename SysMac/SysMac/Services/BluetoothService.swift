@@ -45,9 +45,17 @@ enum BluetoothService {
 
     private static func parseDevices(from value: Any, into devices: inout [BluetoothDevice], connected: Bool) {
         if let arr = value as? [[String: Any]] {
+            // Each element is {"DeviceName": {properties}} - a single-key dict
             for item in arr {
-                if let device = parseDevice(item, connected: connected) {
-                    devices.append(device)
+                for (name, propValue) in item {
+                    if let props = propValue as? [String: Any] {
+                        if var device = parseDevice(props, connected: connected) {
+                            if device.name == "Unknown Device" {
+                                device = BluetoothDevice(name: name, address: device.address, deviceType: device.deviceType, batteryPercent: device.batteryPercent, isConnected: device.isConnected, isPaired: device.isPaired, vendor: device.vendor)
+                            }
+                            devices.append(device)
+                        }
+                    }
                 }
             }
         } else if let dict = value as? [String: [String: Any]] {
