@@ -1,6 +1,6 @@
 import Foundation
 
-struct ProcessInfo: Identifiable {
+struct ProcessItem: Identifiable {
     let id: UInt32  // pid
     let pid: UInt32
     let ppid: UInt32

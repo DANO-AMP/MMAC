@@ -13,6 +13,7 @@ let package = Package(
         .executableTarget(
             name: "SysMac",
             path: "SysMac",
+            exclude: ["SysMac.entitlements"],
             resources: [
                 .process("Resources")
             ],
@@ -20,6 +21,11 @@ let package = Package(
                 .linkedFramework("IOKit"),
                 .linkedFramework("Metal"),
             ]
+        ),
+        .testTarget(
+            name: "SysMacTests",
+            dependencies: ["SysMac"],
+            path: "Tests"
         )
     ]
 )
