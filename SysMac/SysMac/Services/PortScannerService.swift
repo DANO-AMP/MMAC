@@ -16,8 +16,8 @@ enum PortScannerService {
             let processName = String(parts[0])
             let pid = UInt32(parts[1]) ?? 0
 
-            // Parse the address:port from the NAME column (last)
-            let nameField = String(parts.last ?? "")
+            // Parse the address:port from the NAME column (index 8, not last - last is "(LISTEN)")
+            let nameField = String(parts[8])
             guard let colonIdx = nameField.lastIndex(of: ":") else { continue }
             let portStr = nameField[nameField.index(after: colonIdx)...]
             guard let port = UInt16(portStr) else { continue }
