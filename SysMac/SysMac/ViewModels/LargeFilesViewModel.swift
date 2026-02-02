@@ -19,4 +19,13 @@ final class LargeFilesViewModel: ObservableObject {
     }
 
     var totalSize: UInt64 { files.reduce(0) { $0 + $1.size } }
+
+    func deleteFile(_ file: LargeFile) {
+        do {
+            try FileManager.default.trashItem(at: URL(fileURLWithPath: file.path), resultingItemURL: nil)
+            files.removeAll { $0.id == file.id }
+        } catch {
+            // silently fail - file may be protected
+        }
+    }
 }

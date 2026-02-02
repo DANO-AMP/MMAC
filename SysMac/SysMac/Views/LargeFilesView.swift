@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LargeFilesView: View {
     @StateObject private var vm = LargeFilesViewModel()
+    @State private var fileToDelete: LargeFile?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,11 +47,30 @@ struct LargeFilesView: View {
                         Text(Formatters.formatSize(file.size))
                             .font(.caption.monospaced())
                             .fontWeight(.semibold)
+                        Button {
+                            fileToDelete = file
+                        } label: {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
                     }
                 }
             }
         }
         .navigationTitle("Archivos Grandes")
         .task { await vm.scan() }
+        .confirmationDialog(
+            "Eliminar archivo",
+            isPresented: Binding(get: { fileToDelete != nil }, set: { if !$0 { fileToDelete = nil } }),
+            presenting: fileToDelete
+        ) { file in
+            Button("Mover a la papelera", role: .destructive) {
+                vm.deleteFile(file)
+                fileToDelete = nil
+            }
+        } message: { file in
+            Text("\(file.name)\n\(Formatters.formatSize(file.size))")
+        }
     }
 }
