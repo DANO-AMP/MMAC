@@ -113,11 +113,10 @@ struct MonitorView: View {
             Text(value)
                 .font(.title2)
                 .fontWeight(.bold)
-            if let subtitle {
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
+            Text(subtitle ?? " ")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .opacity(subtitle != nil ? 1 : 0)
             ProgressView(value: min(max(progress, 0), 1))
                 .tint(color)
         }
