@@ -22,7 +22,8 @@ final class PortScannerViewModel: ObservableObject {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refresh()
+                guard let self else { break }
+                await self.refresh()
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }
@@ -32,7 +33,8 @@ final class PortScannerViewModel: ObservableObject {
 
     func refresh() async {
         isLoading = true
-        ports = PortScannerService.scan()
+        let result = await Task.detached { PortScannerService.scan() }.value
+        ports = result
         isLoading = false
     }
 }

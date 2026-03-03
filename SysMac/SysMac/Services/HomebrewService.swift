@@ -2,7 +2,9 @@ import Foundation
 
 enum HomebrewService {
     static func checkHomebrew() -> HomebrewInfo {
-        let brewPath = ShellHelper.brewPath
+        guard let brewPath = ShellHelper.brewPath else {
+            return HomebrewInfo(installed: false, version: nil, formulaeCount: 0, casksCount: 0)
+        }
         let verResult = ShellHelper.run(brewPath, arguments: ["--version"])
         guard verResult.exitCode == 0 else {
             return HomebrewInfo(installed: false, version: nil, formulaeCount: 0, casksCount: 0)
@@ -19,7 +21,7 @@ enum HomebrewService {
     }
 
     static func listPackages() -> [BrewPackage] {
-        let brewPath = ShellHelper.brewPath
+        guard let brewPath = ShellHelper.brewPath else { return [] }
         var packages: [BrewPackage] = []
 
         // Formulae
@@ -54,8 +56,22 @@ enum HomebrewService {
         return packages
     }
 
+    private static func validatePackageName(_ name: String) -> Result<Void, ServiceError> {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "@._-/"))
+        guard !name.isEmpty, name.unicodeScalars.allSatisfy({ allowed.contains($0) }) else {
+            return .failure(ServiceError("Nombre de paquete no válido: \(name)"))
+        }
+        return .success(())
+    }
+
     static func upgradePackage(_ name: String) -> Result<String, ServiceError> {
-        let result = ShellHelper.run(ShellHelper.brewPath, arguments: ["upgrade", name])
+        if case .failure(let error) = validatePackageName(name) {
+            return .failure(error)
+        }
+        guard let brewPath = ShellHelper.brewPath else {
+            return .failure(ServiceError("Homebrew no está instalado"))
+        }
+        let result = ShellHelper.run(brewPath, arguments: ["upgrade", name])
         if result.exitCode == 0 {
             return .success(result.output)
         }
@@ -63,7 +79,13 @@ enum HomebrewService {
     }
 
     static func uninstallPackage(_ name: String) -> Result<String, ServiceError> {
-        let result = ShellHelper.run(ShellHelper.brewPath, arguments: ["uninstall", name])
+        if case .failure(let error) = validatePackageName(name) {
+            return .failure(error)
+        }
+        guard let brewPath = ShellHelper.brewPath else {
+            return .failure(ServiceError("Homebrew no está instalado"))
+        }
+        let result = ShellHelper.run(brewPath, arguments: ["uninstall", name])
         if result.exitCode == 0 {
             return .success(result.output)
         }
@@ -71,7 +93,10 @@ enum HomebrewService {
     }
 
     static func cleanup() -> Result<String, ServiceError> {
-        let result = ShellHelper.run(ShellHelper.brewPath, arguments: ["cleanup", "--prune=all"])
+        guard let brewPath = ShellHelper.brewPath else {
+            return .failure(ServiceError("Homebrew no está instalado"))
+        }
+        let result = ShellHelper.run(brewPath, arguments: ["cleanup", "--prune=all"])
         if result.exitCode == 0 {
             return .success(result.output)
         }

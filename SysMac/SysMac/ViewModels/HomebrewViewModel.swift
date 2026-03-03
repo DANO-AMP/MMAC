@@ -22,31 +22,44 @@ final class HomebrewViewModel: ObservableObject {
     func load() async {
         isLoading = true
         error = nil
-        info = HomebrewService.checkHomebrew()
-        if info?.installed == true {
-            packages = HomebrewService.listPackages()
+        let brewInfo = await Task.detached { HomebrewService.checkHomebrew() }.value
+        info = brewInfo
+        if brewInfo.installed {
+            let pkgs = await Task.detached { HomebrewService.listPackages() }.value
+            packages = pkgs
         }
         isLoading = false
     }
 
     func upgrade(_ name: String) {
-        switch HomebrewService.upgradePackage(name) {
-        case .success: Task { await load() }
-        case .failure(let err): error = err.message
+        let n = name
+        Task {
+            let result = await Task.detached { HomebrewService.upgradePackage(n) }.value
+            switch result {
+            case .success: await load()
+            case .failure(let err): error = err.message
+            }
         }
     }
 
     func uninstall(_ name: String) {
-        switch HomebrewService.uninstallPackage(name) {
-        case .success: packages.removeAll { $0.name == name }
-        case .failure(let err): error = err.message
+        let n = name
+        Task {
+            let result = await Task.detached { HomebrewService.uninstallPackage(n) }.value
+            switch result {
+            case .success: packages.removeAll { $0.name == n }
+            case .failure(let err): error = err.message
+            }
         }
     }
 
     func cleanup() {
-        switch HomebrewService.cleanup() {
-        case .success: break
-        case .failure(let err): error = err.message
+        Task {
+            let result = await Task.detached { HomebrewService.cleanup() }.value
+            switch result {
+            case .success: break
+            case .failure(let err): error = err.message
+            }
         }
     }
 }

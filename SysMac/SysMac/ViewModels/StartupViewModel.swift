@@ -8,15 +8,21 @@ final class StartupViewModel: ObservableObject {
 
     func load() async {
         isLoading = true
-        items = StartupService.getStartupItems()
+        let loaded = await Task.detached { StartupService.getStartupItems() }.value
+        items = loaded
         isLoading = false
     }
 
     func toggle(item: StartupItem) {
         guard !item.path.isEmpty else { return }
-        switch StartupService.toggleStartupItem(path: item.path, enable: !item.enabled) {
-        case .success: Task { await load() }
-        case .failure(let err): error = err.message
+        let path = item.path
+        let enable = !item.enabled
+        Task {
+            let result = await Task.detached { StartupService.toggleStartupItem(path: path, enable: enable) }.value
+            switch result {
+            case .success: await load()
+            case .failure(let err): error = err.message
+            }
         }
     }
 }

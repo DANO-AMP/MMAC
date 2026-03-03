@@ -12,7 +12,9 @@ final class DuplicatesViewModel: ObservableObject {
 
     func scan() async {
         isLoading = true
-        result = DuplicateService.scanDuplicates(path: searchPath)
+        let path = searchPath
+        let scanned = await Task.detached { DuplicateService.scanDuplicates(path: path) }.value
+        result = scanned
         isLoading = false
     }
 }

@@ -8,7 +8,7 @@ struct SysMacApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(settingsStore)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(settingsStore.theme == "dark" ? .dark : settingsStore.theme == "light" ? .light : nil)
                 .frame(minWidth: 900, minHeight: 600)
         }
         .windowStyle(.titleBar)

@@ -9,21 +9,30 @@ final class ServicesViewModel: ObservableObject {
 
     func load() async {
         isLoading = true
-        result = DaemonsService.listServices()
+        let services = await Task.detached { DaemonsService.listServices() }.value
+        result = services
         isLoading = false
     }
 
     func startService(label: String) {
-        switch DaemonsService.startService(label: label) {
-        case .success: Task { await load() }
-        case .failure(let err): error = err.message
+        let l = label
+        Task {
+            let result = await Task.detached { DaemonsService.startService(label: l) }.value
+            switch result {
+            case .success: await load()
+            case .failure(let err): error = err.message
+            }
         }
     }
 
     func stopService(label: String) {
-        switch DaemonsService.stopService(label: label) {
-        case .success: Task { await load() }
-        case .failure(let err): error = err.message
+        let l = label
+        Task {
+            let result = await Task.detached { DaemonsService.stopService(label: l) }.value
+            switch result {
+            case .success: await load()
+            case .failure(let err): error = err.message
+            }
         }
     }
 }

@@ -6,24 +6,39 @@ enum ProcessService {
         let result = ShellHelper.run("/bin/ps", arguments: ["-axo", "pid,ppid,%cpu,rss,%mem,user,state,wq,comm", "-r"], environment: ["LC_ALL": "C"])
         guard result.exitCode == 0 else { return [] }
 
+        // Batch-fetch all full commands in a single subprocess
+        let fullCommands = getAllFullCommands()
+
         var processes: [ProcessItem] = []
         let lines = result.output.components(separatedBy: "\n")
 
         for line in lines.dropFirst() {
-            if let proc = parsePsLine(line) {
+            if var proc = parsePsLine(line) {
+                if let cmd = fullCommands[proc.pid] {
+                    proc = ProcessItem(pid: proc.pid, ppid: proc.ppid, name: proc.name, cpuUsage: proc.cpuUsage, memoryMB: proc.memoryMB, memoryPercent: proc.memoryPercent, user: proc.user, state: proc.state, threads: proc.threads, command: cmd)
+                }
                 processes.append(proc)
             }
         }
 
-        // Enrich top 100 with full command
-        processes = processes.enumerated().map { (i, proc) in
-            if i < 100, let cmd = getFullCommand(pid: proc.pid) {
-                return ProcessItem(id: proc.pid, pid: proc.pid, ppid: proc.ppid, name: proc.name, cpuUsage: proc.cpuUsage, memoryMB: proc.memoryMB, memoryPercent: proc.memoryPercent, user: proc.user, state: proc.state, threads: proc.threads, command: cmd)
-            }
-            return proc
-        }
-
         return processes
+    }
+
+    /// Fetch all process full commands in a single subprocess call
+    private static func getAllFullCommands() -> [UInt32: String] {
+        let result = ShellHelper.run("/bin/ps", arguments: ["-axo", "pid=,args="], environment: ["LC_ALL": "C"])
+        guard result.exitCode == 0 else { return [:] }
+
+        var dict: [UInt32: String] = [:]
+        for line in result.output.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { continue }
+            // Format: "  PID ARGS..." - split at first space after PID
+            let parts = trimmed.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+            guard parts.count == 2, let pid = UInt32(parts[0]) else { continue }
+            dict[pid] = String(parts[1])
+        }
+        return dict
     }
 
     static func parsePsLine(_ line: String) -> ProcessItem? {
@@ -42,7 +57,6 @@ enum ProcessService {
         let name = fullCommand.split(separator: "/").last.map(String.init) ?? fullCommand
 
         return ProcessItem(
-            id: pid,
             pid: pid,
             ppid: ppid,
             name: name,
@@ -67,12 +81,6 @@ enum ProcessService {
         case "T": return "Detenido"
         default: return "Desconocido"
         }
-    }
-
-    private static func getFullCommand(pid: UInt32) -> String? {
-        let result = ShellHelper.run("/bin/ps", arguments: ["-p", "\(pid)", "-o", "args="])
-        let cmd = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
-        return cmd.isEmpty ? nil : cmd
     }
 
     static func killProcess(pid: UInt32, force: Bool) -> Result<Void, ServiceError> {

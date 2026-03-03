@@ -13,7 +13,6 @@ struct ChartDataPoint: Identifiable {
 final class MonitorViewModel: ObservableObject {
     @Published private(set) var stats: SystemStats?
     @Published private(set) var isLoading = false
-    @Published private(set) var error: String?
     @Published private(set) var chartData: [ChartDataPoint] = []
     @Published var isLive = true
 
@@ -24,7 +23,8 @@ final class MonitorViewModel: ObservableObject {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refresh()
+                guard let self else { break }
+                await self.refresh()
                 try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s
             }
         }
@@ -37,7 +37,6 @@ final class MonitorViewModel: ObservableObject {
 
     func refresh() async {
         isLoading = true
-        error = nil
 
         let newStats = await service.getStats()
         stats = newStats

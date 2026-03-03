@@ -45,7 +45,8 @@ final class ProcessesViewModel: ObservableObject {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refresh()
+                guard let self else { break }
+                await self.refresh()
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }
@@ -58,16 +59,22 @@ final class ProcessesViewModel: ObservableObject {
 
     func refresh() async {
         isLoading = true
-        processes = ProcessService.getAllProcesses()
+        let result = await Task.detached { ProcessService.getAllProcesses() }.value
+        processes = result
         isLoading = false
     }
 
     func killProcess(pid: UInt32, force: Bool) {
-        switch ProcessService.killProcess(pid: pid, force: force) {
-        case .success:
-            processes.removeAll { $0.pid == pid }
-        case .failure(let err):
-            error = err.message
+        let p = pid
+        let f = force
+        Task {
+            let result = await Task.detached { ProcessService.killProcess(pid: p, force: f) }.value
+            switch result {
+            case .success:
+                processes.removeAll { $0.pid == p }
+            case .failure(let err):
+                error = err.message
+            }
         }
     }
 }

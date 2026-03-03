@@ -12,7 +12,8 @@ final class BluetoothViewModel: ObservableObject {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refresh()
+                guard let self else { break }
+                await self.refresh()
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
             }
         }
@@ -26,7 +27,8 @@ final class BluetoothViewModel: ObservableObject {
     func refresh() async {
         isLoading = true
         error = nil
-        switch BluetoothService.getBluetoothInfo() {
+        let result = await Task.detached { BluetoothService.getBluetoothInfo() }.value
+        switch result {
         case .success(let btInfo):
             info = btInfo
         case .failure(let err):

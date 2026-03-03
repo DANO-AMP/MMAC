@@ -12,7 +12,9 @@ final class AnalyzerViewModel: ObservableObject {
 
     func analyze() async {
         isLoading = true
-        items = AnalyzerService.analyze(path: currentPath)
+        let path = currentPath
+        let analyzed = await Task.detached { AnalyzerService.analyze(path: path) }.value
+        items = analyzed
         isLoading = false
     }
 

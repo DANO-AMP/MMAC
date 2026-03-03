@@ -11,18 +11,27 @@ final class ProjectsViewModel: ObservableObject {
 
     func scan() async {
         isLoading = true
-        artifacts = ProjectsService.scan()
+        let scanned = await Task.detached { ProjectsService.scan() }.value
+        artifacts = scanned
         isLoading = false
     }
 
     func deleteSelected(moveToTrash: Bool) {
-        for path in selectedPaths {
-            switch ProjectsService.deleteArtifact(path: path, moveToTrash: moveToTrash) {
-            case .success: break
-            case .failure(let err): error = err.message
+        let paths = selectedPaths
+        let trash = moveToTrash
+        Task {
+            let results = await Task.detached {
+                paths.map { path in
+                    (path, ProjectsService.deleteArtifact(path: path, moveToTrash: trash))
+                }
+            }.value
+            for (_, result) in results {
+                if case .failure(let err) = result {
+                    error = err.message
+                }
             }
+            selectedPaths.removeAll()
+            await scan()
         }
-        selectedPaths.removeAll()
-        Task { await scan() }
     }
 }

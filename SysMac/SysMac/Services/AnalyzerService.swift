@@ -21,7 +21,7 @@ enum AnalyzerService {
             guard let values = try? itemURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]) else { continue }
             if values.isSymbolicLink == true { continue }
             let isDir = values.isDirectory ?? false
-            let size = isDir ? directorySize(itemURL) : fileSize(itemURL)
+            let size = isDir ? FileUtilities.directorySize(at: itemURL) : fileSize(itemURL)
 
             let displayPath = itemURL.path.replacingOccurrences(of: home, with: "~")
 
@@ -39,26 +39,6 @@ enum AnalyzerService {
         return allowed.contains(where: { path.hasPrefix($0) })
     }
 
-    private static func directorySize(_ url: URL) -> UInt64 {
-        let fm = FileManager.default
-        guard let enumerator = fm.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey],
-            options: [.skipsPackageDescendants]
-        ) else { return 0 }
-        var total: UInt64 = 0
-        for case let fileURL as URL in enumerator {
-            guard let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey]) else { continue }
-            // Skip symlinks
-            if values.isSymbolicLink == true {
-                enumerator.skipDescendants()
-                continue
-            }
-            guard values.isRegularFile == true, let size = values.fileSize else { continue }
-            total += UInt64(size)
-        }
-        return total
-    }
 
     private static func fileSize(_ url: URL) -> UInt64 {
         guard let values = try? url.resourceValues(forKeys: [.fileSizeKey]),

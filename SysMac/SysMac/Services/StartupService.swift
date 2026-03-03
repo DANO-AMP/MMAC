@@ -53,13 +53,24 @@ enum StartupService {
     static func toggleStartupItem(path: String, enable: Bool) -> Result<Void, ServiceError> {
         // Validate path
         let url = URL(fileURLWithPath: path)
-        guard FileManager.default.fileExists(atPath: path),
-              url.pathExtension == "plist" else {
+        let resolved = url.resolvingSymlinksInPath()
+        let resolvedPath = resolved.path
+
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let userAgentsDir = home.appendingPathComponent("Library/LaunchAgents").resolvingSymlinksInPath().path
+        let systemAgentsDir = "/Library/LaunchAgents"
+
+        guard resolvedPath.hasPrefix(userAgentsDir + "/") || resolvedPath.hasPrefix(systemAgentsDir + "/") else {
+            return .failure(ServiceError("Ruta no válida: debe estar en LaunchAgents"))
+        }
+
+        guard FileManager.default.fileExists(atPath: resolvedPath),
+              resolved.pathExtension == "plist" else {
             return .failure(ServiceError("Ruta no válida: \(path)"))
         }
 
         let action = enable ? "load" : "unload"
-        let result = ShellHelper.run("/bin/launchctl", arguments: [action, path])
+        let result = ShellHelper.run("/bin/launchctl", arguments: [action, resolvedPath])
         if result.exitCode == 0 {
             return .success(())
         }

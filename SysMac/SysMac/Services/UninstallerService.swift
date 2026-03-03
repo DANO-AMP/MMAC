@@ -28,14 +28,14 @@ enum UninstallerService {
               let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
             // No Info.plist, still list it
             let name = appURL.deletingPathExtension().lastPathComponent
-            let size = directorySize(appURL)
+            let size = FileUtilities.directorySize(at: appURL)
             return AppInfo(name: name, bundleId: "", path: appURL.path, size: size, version: nil, remnants: [], remnantsSize: 0)
         }
 
         let name = (plist["CFBundleName"] as? String) ?? appURL.deletingPathExtension().lastPathComponent
         let bundleId = (plist["CFBundleIdentifier"] as? String) ?? ""
         let version = plist["CFBundleShortVersionString"] as? String
-        let size = directorySize(appURL)
+        let size = FileUtilities.directorySize(at: appURL)
 
         let remnants = findRemnants(bundleId: bundleId, appName: name)
         let remnantsSize = remnants.reduce(0) { $0 + $1.size }
@@ -75,7 +75,7 @@ enum UninstallerService {
             for item in contents {
                 let lower = item.lastPathComponent.lowercased()
                 if patterns.contains(where: { lower.contains($0) }) {
-                    let size = directorySize(item)
+                    let size = FileUtilities.directorySize(at: item)
                     remnants.append(RemnantFile(path: item.path, size: size, remnantType: typeName))
                 }
             }
@@ -88,50 +88,36 @@ enum UninstallerService {
         let fm = FileManager.default
         var freed: UInt64 = 0
 
-        let appURL = URL(fileURLWithPath: path)
-        let appSize = directorySize(appURL)
-        do {
-            if moveToTrash {
-                try fm.trashItem(at: appURL, resultingItemURL: nil)
-            } else {
-                try fm.removeItem(at: appURL)
+        switch PathValidator.validateForDeletion(path) {
+        case .failure(let error):
+            return .failure(error)
+        case .success(let appURL):
+            let appSize = FileUtilities.directorySize(at: appURL)
+            do {
+                if moveToTrash {
+                    try fm.trashItem(at: appURL, resultingItemURL: nil)
+                } else {
+                    try fm.removeItem(at: appURL)
+                }
+                freed += appSize
+            } catch {
+                return .failure(ServiceError("Error al eliminar app: \(error.localizedDescription)"))
             }
-            freed += appSize
-        } catch {
-            return .failure(ServiceError("Error al eliminar app: \(error.localizedDescription)"))
         }
 
         for remnantPath in remnantPaths {
-            let url = URL(fileURLWithPath: remnantPath)
-            let size = directorySize(url)
+            guard case .success(let validatedURL) = PathValidator.validateForDeletion(remnantPath) else { continue }
+            let size = FileUtilities.directorySize(at: validatedURL)
             do {
                 if moveToTrash {
-                    try fm.trashItem(at: url, resultingItemURL: nil)
+                    try fm.trashItem(at: validatedURL, resultingItemURL: nil)
                 } else {
-                    try fm.removeItem(at: url)
+                    try fm.removeItem(at: validatedURL)
                 }
                 freed += size
             } catch { /* skip */ }
         }
 
         return .success(freed)
-    }
-
-    private static func directorySize(_ url: URL) -> UInt64 {
-        let fm = FileManager.default
-        var isDir: ObjCBool = false
-        guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else { return 0 }
-        if !isDir.boolValue {
-            return (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { UInt64($0) } ?? 0
-        }
-        guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey]) else { return 0 }
-        var total: UInt64 = 0
-        for case let fileURL as URL in enumerator {
-            guard let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
-                  values.isRegularFile == true,
-                  let size = values.fileSize else { continue }
-            total += UInt64(size)
-        }
-        return total
     }
 }

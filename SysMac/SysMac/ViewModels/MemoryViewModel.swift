@@ -12,7 +12,8 @@ final class MemoryViewModel: ObservableObject {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refresh()
+                guard let self else { break }
+                await self.refresh()
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
         }
@@ -25,16 +26,20 @@ final class MemoryViewModel: ObservableObject {
 
     func refresh() async {
         isLoading = true
-        memoryInfo = MemoryService.getMemoryInfo()
+        let info = await Task.detached { MemoryService.getMemoryInfo() }.value
+        memoryInfo = info
         isLoading = false
     }
 
     func purge() {
-        switch MemoryService.purgeMemory() {
-        case .success:
-            error = nil
-        case .failure(let err):
-            error = err.message
+        Task {
+            let result = await Task.detached { MemoryService.purgeMemory() }.value
+            switch result {
+            case .success:
+                error = nil
+            case .failure(let err):
+                error = err.message
+            }
         }
     }
 }

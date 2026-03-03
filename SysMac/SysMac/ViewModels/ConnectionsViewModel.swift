@@ -23,7 +23,8 @@ final class ConnectionsViewModel: ObservableObject {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refresh()
+                guard let self else { break }
+                await self.refresh()
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }
@@ -33,7 +34,8 @@ final class ConnectionsViewModel: ObservableObject {
 
     func refresh() async {
         isLoading = true
-        connections = NetworkService.getConnections()
+        let result = await Task.detached { NetworkService.getConnections() }.value
+        connections = result
         isLoading = false
     }
 }

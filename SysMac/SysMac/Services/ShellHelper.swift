@@ -3,7 +3,7 @@ import Foundation
 enum ShellHelper {
     /// Run a shell command and return (stdout, stderr, exitCode)
     @discardableResult
-    static func run(_ command: String, arguments: [String] = [], environment: [String: String]? = nil) -> (output: String, error: String, exitCode: Int32) {
+    static func run(_ command: String, arguments: [String] = [], environment: [String: String]? = nil, timeout: TimeInterval = 10) -> (output: String, error: String, exitCode: Int32) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: command)
         process.arguments = arguments
@@ -27,10 +27,22 @@ enum ShellHelper {
             return ("", "Failed to run \(command): \(error.localizedDescription)", -1)
         }
 
+        var timedOut = false
+        let timeoutWork = DispatchWorkItem {
+            timedOut = true
+            process.terminate()
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
+
         // Read pipes BEFORE waitUntilExit to avoid deadlock when output exceeds pipe buffer
         let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
         let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
+        timeoutWork.cancel()
+
+        if timedOut {
+            return ("", "Command timed out after \(Int(timeout))s: \(command)", -1)
+        }
 
         let output = String(data: outputData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let errorOutput = String(data: errorData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -44,16 +56,6 @@ enum ShellHelper {
         run("/bin/sh", arguments: ["-c", command])
     }
 
-    /// Run a command asynchronously
-    static func runAsync(_ command: String, arguments: [String] = [], environment: [String: String]? = nil) async -> (output: String, error: String, exitCode: Int32) {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let result = run(command, arguments: arguments, environment: environment)
-                continuation.resume(returning: result)
-            }
-        }
-    }
-
     /// Find the full path of a command
     static func which(_ command: String) -> String? {
         let result = run("/usr/bin/which", arguments: [command])
@@ -61,12 +63,12 @@ enum ShellHelper {
     }
 
     /// Get the brew path (handles both Intel and Apple Silicon)
-    static var brewPath: String {
+    static var brewPath: String? {
         if FileManager.default.fileExists(atPath: "/opt/homebrew/bin/brew") {
             return "/opt/homebrew/bin/brew"
         } else if FileManager.default.fileExists(atPath: "/usr/local/bin/brew") {
             return "/usr/local/bin/brew"
         }
-        return "brew"
+        return nil
     }
 }

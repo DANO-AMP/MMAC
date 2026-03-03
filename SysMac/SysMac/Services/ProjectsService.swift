@@ -45,7 +45,7 @@ enum ProjectsService {
             let name = item.lastPathComponent
 
             if artifactPatterns.contains(name) {
-                let size = directorySize(item)
+                let size = FileUtilities.directorySize(at: item)
                 guard size >= 1_048_576 else { continue } // 1MB min
 
                 let modified = (try? item.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
@@ -69,31 +69,22 @@ enum ProjectsService {
     }
 
     static func deleteArtifact(path: String, moveToTrash: Bool) -> Result<UInt64, ServiceError> {
-        let fm = FileManager.default
-        let url = URL(fileURLWithPath: path)
-        let size = directorySize(url)
-        do {
-            if moveToTrash {
-                try fm.trashItem(at: url, resultingItemURL: nil)
-            } else {
-                try fm.removeItem(at: url)
+        switch PathValidator.validateForDeletion(path) {
+        case .failure(let error):
+            return .failure(error)
+        case .success(let validatedURL):
+            let fm = FileManager.default
+            let size = FileUtilities.directorySize(at: validatedURL)
+            do {
+                if moveToTrash {
+                    try fm.trashItem(at: validatedURL, resultingItemURL: nil)
+                } else {
+                    try fm.removeItem(at: validatedURL)
+                }
+                return .success(size)
+            } catch {
+                return .failure(ServiceError("Error al eliminar: \(error.localizedDescription)"))
             }
-            return .success(size)
-        } catch {
-            return .failure(ServiceError("Error al eliminar: \(error.localizedDescription)"))
         }
-    }
-
-    private static func directorySize(_ url: URL) -> UInt64 {
-        let fm = FileManager.default
-        guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey]) else { return 0 }
-        var total: UInt64 = 0
-        for case let fileURL as URL in enumerator {
-            guard let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
-                  values.isRegularFile == true,
-                  let size = values.fileSize else { continue }
-            total += UInt64(size)
-        }
-        return total
     }
 }

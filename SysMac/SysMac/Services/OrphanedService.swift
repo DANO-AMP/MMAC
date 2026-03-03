@@ -52,7 +52,7 @@ enum OrphanedService {
                 if matchesInstalled { continue }
 
                 // Calculate size
-                let size = directorySize(item)
+                let size = FileUtilities.directorySize(at: item)
                 guard size >= 1_048_576 else { continue } // 1MB minimum
 
                 let accessed = (try? item.resourceValues(forKeys: [.contentAccessDateKey]).contentAccessDate?.unixTimestamp) ?? 0
@@ -73,25 +73,5 @@ enum OrphanedService {
         orphanedFiles.sort { $0.size > $1.size }
 
         return OrphanedScanResult(files: orphanedFiles, totalSize: totalSize, totalCount: UInt32(orphanedFiles.count))
-    }
-
-    private static func directorySize(_ url: URL) -> UInt64 {
-        let fm = FileManager.default
-        var isDir: ObjCBool = false
-        guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else { return 0 }
-
-        if !isDir.boolValue {
-            return (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { UInt64($0) } ?? 0
-        }
-
-        guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey]) else { return 0 }
-        var total: UInt64 = 0
-        for case let fileURL as URL in enumerator {
-            guard let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
-                  values.isRegularFile == true,
-                  let size = values.fileSize else { continue }
-            total += UInt64(size)
-        }
-        return total
     }
 }

@@ -3,6 +3,7 @@ import Foundation
 enum DaemonsService {
     static func listServices() -> ServicesResult {
         var userAgents: [LaunchService] = []
+        // TODO: Implement user daemon scanning (launchctl print user/$(id -u)/)
         let userDaemons: [LaunchService] = []
         var systemAgents: [LaunchService] = []
 
@@ -81,12 +82,12 @@ enum DaemonsService {
     }
 
     static func startService(label: String) -> Result<Void, ServiceError> {
-        let result = ShellHelper.shell("launchctl start \(label)")
+        let result = ShellHelper.run("/bin/launchctl", arguments: ["start", label])
         return result.exitCode == 0 ? .success(()) : .failure(ServiceError("Error al iniciar: \(result.error)"))
     }
 
     static func stopService(label: String) -> Result<Void, ServiceError> {
-        let result = ShellHelper.shell("launchctl stop \(label)")
+        let result = ShellHelper.run("/bin/launchctl", arguments: ["stop", label])
         return result.exitCode == 0 ? .success(()) : .failure(ServiceError("Error al detener: \(result.error)"))
     }
 }

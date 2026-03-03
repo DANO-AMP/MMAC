@@ -8,7 +8,8 @@ final class OrphanedViewModel: ObservableObject {
 
     func scan() async {
         isLoading = true
-        result = OrphanedService.scanOrphanedFiles()
+        let scanned = await Task.detached { OrphanedService.scanOrphanedFiles() }.value
+        result = scanned
         isLoading = false
     }
 

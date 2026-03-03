@@ -15,10 +15,3 @@ struct SystemStats {
     var gpuName: String? = nil
     var gpuVendor: String? = nil
 }
-
-struct GpuInfo {
-    let name: String
-    let vendor: String
-    let vramMB: UInt32
-    let metalSupport: Bool
-}

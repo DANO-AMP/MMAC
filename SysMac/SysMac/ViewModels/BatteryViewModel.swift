@@ -12,7 +12,8 @@ final class BatteryViewModel: ObservableObject {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refresh()
+                guard let self else { break }
+                await self.refresh()
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
             }
         }
@@ -25,7 +26,8 @@ final class BatteryViewModel: ObservableObject {
 
     func refresh() async {
         isLoading = true
-        if let info = BatteryService.getBatteryInfo() {
+        let info = await Task.detached { BatteryService.getBatteryInfo() }.value
+        if let info {
             batteryInfo = info
             noBattery = false
         } else {

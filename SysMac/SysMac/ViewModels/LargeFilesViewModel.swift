@@ -14,7 +14,9 @@ final class LargeFilesViewModel: ObservableObject {
     func scan() async {
         isLoading = true
         let minBytes = UInt64(minSizeMB * 1024 * 1024)
-        files = LargeFilesService.findLargeFiles(path: searchPath, minSize: minBytes)
+        let path = searchPath
+        let found = await Task.detached { LargeFilesService.findLargeFiles(path: path, minSize: minBytes) }.value
+        files = found
         isLoading = false
     }
 

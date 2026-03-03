@@ -92,7 +92,7 @@ struct MonitorView: View {
             )
             metricCard(
                 title: "Temperatura",
-                value: Formatters.formatTemperature(Double(current.cpuTemp)),
+                value: Formatters.formatTemperature(Double(current.cpuTemp)) + " (est.)",
                 subtitle: current.cpuTemp < 50 ? "Normal" : current.cpuTemp < 70 ? "Moderada" : "Alta",
                 progress: Double(current.cpuTemp) / 100.0,
                 icon: "thermometer.medium",

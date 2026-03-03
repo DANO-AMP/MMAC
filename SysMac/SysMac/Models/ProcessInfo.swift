@@ -1,7 +1,7 @@
 import Foundation
 
 struct ProcessItem: Identifiable {
-    let id: UInt32  // pid
+    var id: UInt32 { pid }
     let pid: UInt32
     let ppid: UInt32
     let name: String

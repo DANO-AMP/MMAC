@@ -14,15 +14,20 @@ final class CleaningViewModel: ObservableObject {
     func scan() async {
         isScanning = true
         error = nil
-        results = CleaningService.scanAll()
+        let scanned = await Task.detached { CleaningService.scanAll() }.value
+        results = scanned
         isScanning = false
     }
 
     func clean(moveToTrash: Bool) async {
         isCleaning = true
-        for result in results where selectedCategories.contains(result.category) {
-            _ = CleaningService.cleanCategory(result.category, paths: result.paths, moveToTrash: moveToTrash)
-        }
+        let toClean = results.filter { selectedCategories.contains($0.category) }
+        let trash = moveToTrash
+        await Task.detached {
+            for item in toClean {
+                _ = CleaningService.cleanCategory(item.category, paths: item.paths, moveToTrash: trash)
+            }
+        }.value
         selectedCategories.removeAll()
         isCleaning = false
         await scan()

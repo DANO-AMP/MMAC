@@ -87,7 +87,7 @@ enum PortScannerService {
     private static func getWorkingDir(_ pid: UInt32) -> String? {
         let result = ShellHelper.run("/usr/sbin/lsof", arguments: ["-p", "\(pid)", "-d", "cwd", "-Fn"])
         for line in result.output.components(separatedBy: "\n") {
-            if line.hasPrefix("n") && !line.hasPrefix("n/") == false {
+            if line.hasPrefix("n/") {
                 return String(line.dropFirst())
             }
         }

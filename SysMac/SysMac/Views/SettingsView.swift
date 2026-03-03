@@ -11,9 +11,7 @@ struct SettingsView: View {
             }
 
             Section("Limpieza") {
-                Toggle("Proteger archivos recientes", isOn: $settings.protectRecent)
-                Stepper("Días recientes: \(settings.recentDays)", value: $settings.recentDays, in: 1...30)
-                Toggle("Confirmar antes de eliminar", isOn: $settings.confirmDelete)
+Toggle("Confirmar antes de eliminar", isOn: $settings.confirmDelete)
                 Toggle("Mover a la papelera", isOn: $settings.moveToTrash)
             }
         }

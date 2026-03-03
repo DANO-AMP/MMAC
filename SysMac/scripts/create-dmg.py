@@ -76,7 +76,7 @@ def main():
     <key>NSSupportsAutomaticTermination</key>
     <true/>
     <key>NSSupportsSuddenTermination</key>
-    <true/>
+    <false/>
     <key>NSRequiresAquaSystemAppearance</key>
     <false/>
 </dict>

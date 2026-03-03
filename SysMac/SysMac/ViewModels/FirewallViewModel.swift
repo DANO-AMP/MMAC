@@ -8,8 +8,11 @@ final class FirewallViewModel: ObservableObject {
 
     func refresh() async {
         isLoading = true
-        status = FirewallService.getFirewallStatus()
-        processConnections = FirewallService.getOutgoingConnections()
+        let (newStatus, newConnections) = await Task.detached {
+            (FirewallService.getFirewallStatus(), FirewallService.getOutgoingConnections())
+        }.value
+        status = newStatus
+        processConnections = newConnections
         isLoading = false
     }
 }
