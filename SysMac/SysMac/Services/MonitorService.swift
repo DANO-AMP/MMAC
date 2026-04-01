@@ -12,6 +12,9 @@ actor MonitorService {
     private var cachedGpuName: String?
     private var cachedGpuVendor: String?
     private var gpuFetched = false
+    private var cachedFanSpeed: UInt32?
+    private var lastFanCheck: Date?
+    private static let fanCheckInterval: TimeInterval = 10
 
     func getStats() -> SystemStats {
         let cpuUsage = getCPUUsage()
@@ -156,8 +159,14 @@ actor MonitorService {
     // MARK: - Fan Speed
 
     private func getFanSpeed() -> UInt32? {
-        let result = ShellHelper.run("/usr/sbin/ioreg", arguments: ["-r", "-c", "AppleSMCLMU"])
-        guard result.exitCode == 0 else { return nil }
+        let now = Date()
+        if let cached = cachedFanSpeed, let lastCheck = lastFanCheck,
+           now.timeIntervalSince(lastCheck) < Self.fanCheckInterval {
+            return cached
+        }
+
+        let result = ShellHelper.run("/usr/sbin/ioreg", arguments: ["-r", "-c", "AppleSMCLMU"], timeout: 3)
+        guard result.exitCode == 0 else { return cachedFanSpeed }
 
         for line in result.output.components(separatedBy: "\n") {
             if line.contains("FanSpeed") || line.contains("Fan Speed") {
@@ -166,12 +175,15 @@ actor MonitorService {
                     let cleaned = parts[1].trimmingCharacters(in: .whitespaces)
                         .trimmingCharacters(in: CharacterSet(charactersIn: "\" "))
                     if let speed = UInt32(cleaned) {
+                        cachedFanSpeed = speed
+                        lastFanCheck = now
                         return speed
                     }
                 }
             }
         }
-        return nil
+        lastFanCheck = now
+        return cachedFanSpeed
     }
 
     // MARK: - Disk I/O
