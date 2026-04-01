@@ -82,7 +82,7 @@ enum NetworkService {
     }
 
     static func flushDNS() -> Result<Void, ServiceError> {
-        let result = ShellHelper.shell("dscacheutil -flushcache")
+        let result = ShellHelper.run("/usr/bin/dscacheutil", arguments: ["-flushcache"])
         if result.exitCode == 0 {
             return .success(())
         }

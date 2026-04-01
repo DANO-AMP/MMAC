@@ -50,10 +50,19 @@ enum ShellHelper {
         return (output, errorOutput, process.terminationStatus)
     }
 
-    /// Run a command using /bin/sh -c for shell features (pipes, redirects)
+    /// Run a command using /bin/sh -c for shell features (pipes, redirects).
+    /// WARNING: Only use with hardcoded constant strings. Never pass user-controlled input.
+    /// Prefer `run()` with explicit arguments for safer execution.
+    @discardableResult
+    static func shellRaw(_ command: String) -> (output: String, error: String, exitCode: Int32) {
+        run("/bin/sh", arguments: ["-c", command])
+    }
+
+    /// Deprecated: use shellRaw() to make the risk explicit.
+    @available(*, deprecated, renamed: "shellRaw")
     @discardableResult
     static func shell(_ command: String) -> (output: String, error: String, exitCode: Int32) {
-        run("/bin/sh", arguments: ["-c", command])
+        shellRaw(command)
     }
 
     /// Find the full path of a command
