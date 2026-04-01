@@ -79,4 +79,29 @@ enum OrphanedService {
 
         return OrphanedScanResult(files: orphanedFiles, totalSize: totalSize, totalCount: UInt32(orphanedFiles.count))
     }
+
+    static func deleteFiles(paths: Set<String>, moveToTrash: Bool) -> (deleted: Int, failed: [String]) {
+        let fm = FileManager.default
+        var deleted = 0
+        var failed: [String] = []
+
+        for path in paths {
+            guard case .success(let validatedURL) = PathValidator.validateForDeletion(path) else {
+                failed.append(path)
+                continue
+            }
+            do {
+                if moveToTrash {
+                    try fm.trashItem(at: validatedURL, resultingItemURL: nil)
+                } else {
+                    try fm.removeItem(at: validatedURL)
+                }
+                deleted += 1
+            } catch {
+                failed.append(path)
+            }
+        }
+
+        return (deleted, failed)
+    }
 }

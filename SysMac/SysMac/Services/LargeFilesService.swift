@@ -38,4 +38,21 @@ enum LargeFilesService {
 
         return topFiles
     }
+
+    static func deleteFile(path: String, moveToTrash: Bool) -> Result<Void, ServiceError> {
+        guard case .success(let validatedURL) = PathValidator.validateForDeletion(path) else {
+            return .failure(ServiceError("Ruta no permitida: \(path)"))
+        }
+        let fm = FileManager.default
+        do {
+            if moveToTrash {
+                try fm.trashItem(at: validatedURL, resultingItemURL: nil)
+            } else {
+                try fm.removeItem(at: validatedURL)
+            }
+            return .success(())
+        } catch {
+            return .failure(ServiceError("Error al eliminar: \(error.localizedDescription)"))
+        }
+    }
 }

@@ -35,12 +35,13 @@ enum CleaningService {
         }
     }
 
-    static func cleanCategory(_ category: String, paths: [String], moveToTrash: Bool) -> UInt64 {
+    static func cleanCategory(_ category: String, paths: [String], moveToTrash: Bool) -> (freed: UInt64, failed: Int) {
         var freed: UInt64 = 0
+        var failedCount = 0
         let fm = FileManager.default
         for path in paths {
             guard fm.fileExists(atPath: path) else { continue }
-            guard case .success(let validatedURL) = PathValidator.validateForDeletion(path) else { continue }
+            guard case .success(let validatedURL) = PathValidator.validateForDeletion(path) else { failedCount += 1; continue }
             let size = FileUtilities.directorySize(at: validatedURL)
             do {
                 if moveToTrash && category != "trash" {
@@ -49,9 +50,11 @@ enum CleaningService {
                     try fm.removeItem(at: validatedURL)
                 }
                 freed += size
-            } catch { /* skip */ }
+            } catch {
+                failedCount += 1
+            }
         }
-        return freed
+        return (freed, failedCount)
     }
 
     // MARK: - Categories
