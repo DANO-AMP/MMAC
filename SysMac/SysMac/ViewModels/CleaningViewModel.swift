@@ -14,7 +14,7 @@ final class CleaningViewModel: ObservableObject {
     func scan() async {
         isScanning = true
         error = nil
-        let scanned = await Task.detached { CleaningService.scanAll() }.value
+        let scanned = await CleaningService.scanAll()
         results = scanned
         isScanning = false
     }

@@ -1,17 +1,38 @@
 import Foundation
 
 enum CleaningService {
-    static func scanAll() -> [ScanResult] {
+    static func scanAll() async -> [ScanResult] {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        return [
-            scanCaches(home),
-            scanLogs(home),
-            scanBrowserData(home),
-            scanTrash(home),
-            scanCrashReports(home),
-            scanXcodeData(home),
-            scanPackageCaches(home),
-        ]
+
+        return await withTaskGroup(of: ScanResult.self) { group in
+            group.addTask {
+                await Task.detached { Self.scanCaches(home) }.value
+            }
+            group.addTask {
+                await Task.detached { Self.scanLogs(home) }.value
+            }
+            group.addTask {
+                await Task.detached { Self.scanBrowserData(home) }.value
+            }
+            group.addTask {
+                await Task.detached { Self.scanTrash(home) }.value
+            }
+            group.addTask {
+                await Task.detached { Self.scanCrashReports(home) }.value
+            }
+            group.addTask {
+                await Task.detached { Self.scanXcodeData(home) }.value
+            }
+            group.addTask {
+                await Task.detached { Self.scanPackageCaches(home) }.value
+            }
+
+            var results: [ScanResult] = []
+            for await result in group {
+                results.append(result)
+            }
+            return results
+        }
     }
 
     static func cleanCategory(_ category: String, paths: [String], moveToTrash: Bool) -> UInt64 {
