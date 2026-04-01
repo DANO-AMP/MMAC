@@ -3,20 +3,14 @@ import Darwin
 
 enum ProcessService {
     static func getAllProcesses() -> [ProcessItem] {
-        let result = ShellHelper.run("/bin/ps", arguments: ["-axo", "pid,ppid,%cpu,rss,%mem,user,state,wq,comm", "-r"], environment: ["LC_ALL": "C"])
+        let result = ShellHelper.run("/bin/ps", arguments: ["-axo", "pid,ppid,%cpu,rss,%mem,user,state,wq,args=", "-r"], environment: ["LC_ALL": "C"])
         guard result.exitCode == 0 else { return [] }
-
-        // Batch-fetch all full commands in a single subprocess
-        let fullCommands = getAllFullCommands()
 
         var processes: [ProcessItem] = []
         let lines = result.output.components(separatedBy: "\n")
 
         for line in lines.dropFirst() {
-            if var proc = parsePsLine(line) {
-                if let cmd = fullCommands[proc.pid] {
-                    proc = ProcessItem(pid: proc.pid, ppid: proc.ppid, name: proc.name, cpuUsage: proc.cpuUsage, memoryMB: proc.memoryMB, memoryPercent: proc.memoryPercent, user: proc.user, state: proc.state, threads: proc.threads, command: cmd)
-                }
+            if let proc = parsePsLine(line) {
                 processes.append(proc)
             }
         }
@@ -24,37 +18,28 @@ enum ProcessService {
         return processes
     }
 
-    /// Fetch all process full commands in a single subprocess call
-    private static func getAllFullCommands() -> [UInt32: String] {
-        let result = ShellHelper.run("/bin/ps", arguments: ["-axo", "pid=,args="], environment: ["LC_ALL": "C"])
-        guard result.exitCode == 0 else { return [:] }
-
-        var dict: [UInt32: String] = [:]
-        for line in result.output.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty else { continue }
-            // Format: "  PID ARGS..." - split at first space after PID
-            let parts = trimmed.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
-            guard parts.count == 2, let pid = UInt32(parts[0]) else { continue }
-            dict[pid] = String(parts[1])
-        }
-        return dict
-    }
-
     static func parsePsLine(_ line: String) -> ProcessItem? {
-        let parts = line.split(separator: " ", maxSplits: 8, omittingEmptySubsequences: true)
-        guard parts.count >= 9 else { return nil }
+        let scanner = Scanner(string: line)
+        scanner.charactersToBeSkipped = CharacterSet.whitespaces
 
-        guard let pid = UInt32(parts[0]) else { return nil }
-        let ppid = UInt32(parts[1]) ?? 0
-        let cpuUsage = Float(parts[2]) ?? 0
-        let rssKb = Float(parts[3]) ?? 0
-        let memPercent = Float(parts[4]) ?? 0
-        let user = String(parts[5])
-        let state = parseState(String(parts[6]))
-        let threads = UInt32(parts[7]) ?? 1
-        let fullCommand = String(parts[8])
-        let name = fullCommand.split(separator: "/").last.map(String.init) ?? fullCommand
+        guard let pidStr = scanner.scanUpToString(" "),
+              let pid = UInt32(pidStr),
+              let ppidStr = scanner.scanUpToString(" "),
+              let ppid = UInt32(ppidStr),
+              let cpuStr = scanner.scanUpToString(" "),
+              let cpuUsage = Float(cpuStr),
+              let rssStr = scanner.scanUpToString(" "),
+              let rssKb = Float(rssStr),
+              let memStr = scanner.scanUpToString(" "),
+              let memPercent = Float(memStr),
+              let user = scanner.scanUpToString(" "),
+              let stateStr = scanner.scanUpToString(" "),
+              let threadsStr = scanner.scanUpToString(" "),
+              let threads = UInt32(threadsStr) else { return nil }
+
+        // Everything remaining is the full command
+        let command = scanner.remainingString?.trimmingCharacters(in: .whitespaces) ?? ""
+        let name = command.split(separator: "/").last.map(String.init) ?? command
 
         return ProcessItem(
             pid: pid,
@@ -64,9 +49,9 @@ enum ProcessService {
             memoryMB: rssKb / 1024.0,
             memoryPercent: memPercent,
             user: user,
-            state: state,
+            state: parseState(stateStr),
             threads: threads,
-            command: fullCommand
+            command: command
         )
     }
 
