@@ -19,7 +19,7 @@ enum ProcessService {
     }
 
     static func parsePsLine(_ line: String) -> ProcessItem? {
-        let scanner = Scanner(string: line)
+        var scanner = Scanner(string: line)
         scanner.charactersToBeSkipped = CharacterSet.whitespaces
 
         guard let pidStr = scanner.scanUpToString(" "),
@@ -38,7 +38,7 @@ enum ProcessService {
               let threads = UInt32(threadsStr) else { return nil }
 
         // Everything remaining is the full command
-        let command = scanner.remainingString?.trimmingCharacters(in: .whitespaces) ?? ""
+        let command = String(line[scanner.currentIndex...]).trimmingCharacters(in: .whitespaces)
         let name = command.split(separator: "/").last.map(String.init) ?? command
 
         return ProcessItem(
