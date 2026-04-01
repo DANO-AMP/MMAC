@@ -9,7 +9,7 @@ enum LargeFilesService {
             return []
         }
 
-        var files: [LargeFile] = []
+        var topFiles: [LargeFile] = []
 
         for case let fileURL as URL in enumerator {
             guard let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]),
@@ -18,19 +18,24 @@ enum LargeFilesService {
                   UInt64(size) >= minSize else { continue }
 
             let modified = values.contentModificationDate?.unixTimestamp ?? 0
-
-            files.append(LargeFile(
+            let file = LargeFile(
                 path: fileURL.path,
                 name: fileURL.lastPathComponent,
                 size: UInt64(size),
                 modified: UInt64(modified)
-            ))
+            )
+
+            if topFiles.count < limit {
+                topFiles.append(file)
+                if topFiles.count == limit {
+                    topFiles.sort { $0.size > $1.size }
+                }
+            } else if size > topFiles.last!.size {
+                topFiles[topFiles.count - 1] = file
+                topFiles.sort { $0.size > $1.size }
+            }
         }
 
-        files.sort { $0.size > $1.size }
-        if files.count > limit {
-            files = Array(files.prefix(limit))
-        }
-        return files
+        return topFiles
     }
 }
