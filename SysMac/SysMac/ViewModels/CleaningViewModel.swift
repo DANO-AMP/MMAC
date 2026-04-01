@@ -14,20 +14,26 @@ final class CleaningViewModel: ObservableObject {
     func scan() async {
         isScanning = true
         error = nil
-        let scanned = await Task.detached { CleaningService.scanAll() }.value
+        let scanned = await CleaningService.scanAll()
         results = scanned
         isScanning = false
     }
 
     func clean(moveToTrash: Bool) async {
         isCleaning = true
+        error = nil
         let toClean = results.filter { selectedCategories.contains($0.category) }
         let trash = moveToTrash
+        var totalFailed = 0
         await Task.detached {
             for item in toClean {
-                _ = CleaningService.cleanCategory(item.category, paths: item.paths, moveToTrash: trash)
+                let result = CleaningService.cleanCategory(item.category, paths: item.paths, moveToTrash: trash)
+                totalFailed += result.failed
             }
         }.value
+        if totalFailed > 0 {
+            error = "\(totalFailed) elementos no se pudieron eliminar"
+        }
         selectedCategories.removeAll()
         isCleaning = false
         await scan()

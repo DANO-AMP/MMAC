@@ -4,12 +4,24 @@ enum NetworkService {
     static func getConnections() -> [NetworkConnection] {
         var connections: [NetworkConnection] = []
 
+        // Batch all process lookups into a single /bin/ps call instead of per-PID forks
+        var processMap: [UInt32: String] = [:]
+        let psResult = ShellHelper.run("/bin/ps", arguments: ["-axo", "pid=,comm="])
+        if psResult.exitCode == 0 {
+            for line in psResult.output.components(separatedBy: "\n") {
+                let parts = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+                guard parts.count == 2, let pid = UInt32(parts[0]) else { continue }
+                let name = parts[1].split(separator: "/").last.map(String.init) ?? String(parts[1])
+                processMap[pid] = name
+            }
+        }
+
         for proto in ["tcp", "udp"] {
             let result = ShellHelper.run("/usr/sbin/netstat", arguments: ["-anvp", proto])
             guard result.exitCode == 0 else { continue }
 
             for line in result.output.components(separatedBy: "\n").dropFirst(2) {
-                if let conn = parseNetstatLine(line, proto: proto) {
+                if let conn = parseNetstatLine(line, proto: proto, processMap: processMap) {
                     connections.append(conn)
                 }
             }
@@ -18,7 +30,7 @@ enum NetworkService {
         return connections
     }
 
-    private static func parseNetstatLine(_ line: String, proto: String) -> NetworkConnection? {
+    private static func parseNetstatLine(_ line: String, proto: String, processMap: [UInt32: String]) -> NetworkConnection? {
         let parts = line.split(separator: " ", omittingEmptySubsequences: true)
         guard parts.count >= 9 else { return nil }
 
@@ -38,7 +50,7 @@ enum NetworkService {
             remotePort: remotePort,
             state: state,
             pid: pid,
-            processName: pid > 0 ? getProcessName(pid) : ""
+            processName: pid > 0 ? processMap[pid] ?? "" : ""
         )
     }
 
@@ -53,12 +65,6 @@ enum NetworkService {
         }
 
         return (addr, 0)
-    }
-
-    private static func getProcessName(_ pid: UInt32) -> String {
-        let result = ShellHelper.run("/bin/ps", arguments: ["-p", "\(pid)", "-o", "comm="])
-        let name = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.split(separator: "/").last.map(String.init) ?? name
     }
 
     static func getHostsFile() -> [HostEntry] {
@@ -76,7 +82,7 @@ enum NetworkService {
     }
 
     static func flushDNS() -> Result<Void, ServiceError> {
-        let result = ShellHelper.shell("dscacheutil -flushcache")
+        let result = ShellHelper.run("/usr/bin/dscacheutil", arguments: ["-flushcache"])
         if result.exitCode == 0 {
             return .success(())
         }

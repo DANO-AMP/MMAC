@@ -6,7 +6,9 @@ enum PortScannerService {
         guard result.exitCode == 0 else { return [] }
 
         var portMap: [UInt16: PortInfo] = [:]
+        var allPids: Set<UInt32> = []
 
+        // First pass: collect all listening ports with placeholder details
         for line in result.output.components(separatedBy: "\n").dropFirst() {
             guard line.contains("LISTEN") || line.contains("(LISTEN)") else { continue }
 
@@ -27,7 +29,6 @@ enum PortScannerService {
 
             if portMap[port] == nil {
                 let serviceType = detectServiceType(processName: processName, port: port)
-                let (cpu, mem) = getProcessStats(pid)
 
                 portMap[port] = PortInfo(
                     port: port,
@@ -36,12 +37,43 @@ enum PortScannerService {
                     serviceType: serviceType,
                     proto: proto,
                     localAddress: localAddr,
-                    workingDir: getWorkingDir(pid),
-                    command: getCommand(pid),
-                    cpuUsage: cpu,
-                    memoryMB: mem
+                    workingDir: nil,
+                    command: nil,
+                    cpuUsage: 0,
+                    memoryMB: 0
                 )
+
+                if pid != 0 { allPids.insert(pid) }
             }
+        }
+
+        // Batch-fetch details for all PIDs in just 3 subprocess calls
+        guard !allPids.isEmpty else {
+            return Array(portMap.values).sorted { $0.port < $1.port }
+        }
+
+        let pidList = allPids.map(String.init).joined(separator: ",")
+        let statsMap = batchProcessStats(pidList)
+        let dirMap = batchWorkingDirs(pidList)
+        let cmdMap = batchCommands(pidList)
+
+        // Merge batch results back into port entries
+        for port in portMap.keys {
+            let existing = portMap[port]!
+            if existing.pid == 0 { continue }
+            let (cpu, mem) = statsMap[existing.pid] ?? (0, 0)
+            portMap[port] = PortInfo(
+                port: existing.port,
+                pid: existing.pid,
+                processName: existing.processName,
+                serviceType: existing.serviceType,
+                proto: existing.proto,
+                localAddress: existing.localAddress,
+                workingDir: dirMap[existing.pid],
+                command: cmdMap[existing.pid],
+                cpuUsage: cpu,
+                memoryMB: mem
+            )
         }
 
         return Array(portMap.values).sorted { $0.port < $1.port }
@@ -75,28 +107,43 @@ enum PortScannerService {
         }
     }
 
-    private static func getProcessStats(_ pid: UInt32) -> (Float, Float) {
-        let result = ShellHelper.run("/bin/ps", arguments: ["-p", "\(pid)", "-o", "%cpu,rss="], environment: ["LC_ALL": "C"])
-        let parts = result.output.split(separator: " ", omittingEmptySubsequences: true)
-        guard parts.count >= 2 else { return (0, 0) }
-        let cpu = Float(parts[0]) ?? 0
-        let rssKb = Float(parts[1]) ?? 0
-        return (cpu, rssKb / 1024.0)
+    private static func batchProcessStats(_ pidList: String) -> [UInt32: (Float, Float)] {
+        let result = ShellHelper.run("/bin/ps", arguments: ["-p", pidList, "-o", "pid=,%cpu,rss="], environment: ["LC_ALL": "C"])
+        var map: [UInt32: (Float, Float)] = [:]
+        for line in result.output.components(separatedBy: "\n") {
+            let parts = line.split(separator: " ", omittingEmptySubsequences: true)
+            guard parts.count >= 3, let pid = UInt32(parts[0]) else { continue }
+            let cpu = Float(parts[1]) ?? 0
+            let rssKb = Float(parts[2]) ?? 0
+            map[pid] = (cpu, rssKb / 1024.0)
+        }
+        return map
     }
 
-    private static func getWorkingDir(_ pid: UInt32) -> String? {
-        let result = ShellHelper.run("/usr/sbin/lsof", arguments: ["-p", "\(pid)", "-d", "cwd", "-Fn"])
+    private static func batchWorkingDirs(_ pidList: String) -> [UInt32: String] {
+        let result = ShellHelper.run("/usr/sbin/lsof", arguments: ["-p", pidList, "-d", "cwd", "-Fn"])
+        var map: [UInt32: String] = [:]
+        var currentPid: UInt32?
         for line in result.output.components(separatedBy: "\n") {
-            if line.hasPrefix("n/") {
-                return String(line.dropFirst())
+            if line.hasPrefix("p") {
+                currentPid = UInt32(line.dropFirst())
+            } else if line.hasPrefix("n/"), let pid = currentPid {
+                map[pid] = String(line.dropFirst())
+                currentPid = nil
             }
         }
-        return nil
+        return map
     }
 
-    private static func getCommand(_ pid: UInt32) -> String? {
-        let result = ShellHelper.run("/bin/ps", arguments: ["-p", "\(pid)", "-o", "args="])
-        let cmd = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
-        return cmd.isEmpty ? nil : cmd
+    private static func batchCommands(_ pidList: String) -> [UInt32: String] {
+        let result = ShellHelper.run("/bin/ps", arguments: ["-p", pidList, "-o", "pid=,args="], environment: ["LC_ALL": "C"])
+        var map: [UInt32: String] = [:]
+        for line in result.output.components(separatedBy: "\n") {
+            let parts = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+            guard parts.count == 2, let pid = UInt32(parts[0]) else { continue }
+            let cmd = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cmd.isEmpty { map[pid] = cmd }
+        }
+        return map
     }
 }

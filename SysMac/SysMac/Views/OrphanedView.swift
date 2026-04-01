@@ -24,7 +24,7 @@ struct OrphanedView: View {
 
                 if !vm.selectedPaths.isEmpty {
                     Button {
-                        vm.deleteSelected(moveToTrash: settings.moveToTrash)
+                        Task { await vm.deleteSelected(moveToTrash: settings.moveToTrash) }
                     } label: {
                         Label("Eliminar (\(vm.selectedPaths.count))", systemImage: "trash")
                     }

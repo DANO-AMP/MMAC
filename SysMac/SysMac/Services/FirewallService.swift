@@ -2,13 +2,13 @@ import Foundation
 
 enum FirewallService {
     static func getFirewallStatus() -> FirewallStatus {
-        let result = ShellHelper.shell("defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null")
+        let result = ShellHelper.run("/usr/bin/defaults", arguments: ["read", "/Library/Preferences/com.apple.alf", "globalstate"])
         let enabled = result.output.trimmingCharacters(in: .whitespacesAndNewlines) != "0"
 
-        let stealthResult = ShellHelper.shell("defaults read /Library/Preferences/com.apple.alf stealthenabled 2>/dev/null")
+        let stealthResult = ShellHelper.run("/usr/bin/defaults", arguments: ["read", "/Library/Preferences/com.apple.alf", "stealthenabled"])
         let stealth = stealthResult.output.trimmingCharacters(in: .whitespacesAndNewlines) == "1"
 
-        let blockResult = ShellHelper.shell("defaults read /Library/Preferences/com.apple.alf allowsignedenabled 2>/dev/null")
+        let blockResult = ShellHelper.run("/usr/bin/defaults", arguments: ["read", "/Library/Preferences/com.apple.alf", "allowsignedenabled"])
         let blockAll = blockResult.output.trimmingCharacters(in: .whitespacesAndNewlines) == "0"
 
         return FirewallStatus(enabled: enabled, stealthMode: stealth, blockAllIncoming: blockAll)

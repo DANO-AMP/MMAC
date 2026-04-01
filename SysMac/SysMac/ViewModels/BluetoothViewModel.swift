@@ -14,7 +14,7 @@ final class BluetoothViewModel: ObservableObject {
             while !Task.isCancelled {
                 guard let self else { break }
                 await self.refresh()
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
             }
         }
     }

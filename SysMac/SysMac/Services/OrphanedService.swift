@@ -51,7 +51,12 @@ enum OrphanedService {
                 let matchesInstalled = installedIds.contains(name) || installedNames.contains(where: { name.contains($0) })
                 if matchesInstalled { continue }
 
-                // Calculate size
+                // Cheap pre-check: skip directories whose total file size metadata is under 1MB
+                if let topValues = try? item.resourceValues(forKeys: [.totalFileSizeKey]),
+                   let topSize = topValues.totalFileSize, topSize < 1_048_576 {
+                    continue
+                }
+
                 let size = FileUtilities.directorySize(at: item)
                 guard size >= 1_048_576 else { continue } // 1MB minimum
 
@@ -73,5 +78,30 @@ enum OrphanedService {
         orphanedFiles.sort { $0.size > $1.size }
 
         return OrphanedScanResult(files: orphanedFiles, totalSize: totalSize, totalCount: UInt32(orphanedFiles.count))
+    }
+
+    static func deleteFiles(paths: Set<String>, moveToTrash: Bool) -> (deleted: Int, failed: [String]) {
+        let fm = FileManager.default
+        var deleted = 0
+        var failed: [String] = []
+
+        for path in paths {
+            guard case .success(let validatedURL) = PathValidator.validateForDeletion(path) else {
+                failed.append(path)
+                continue
+            }
+            do {
+                if moveToTrash {
+                    try fm.trashItem(at: validatedURL, resultingItemURL: nil)
+                } else {
+                    try fm.removeItem(at: validatedURL)
+                }
+                deleted += 1
+            } catch {
+                failed.append(path)
+            }
+        }
+
+        return (deleted, failed)
     }
 }
