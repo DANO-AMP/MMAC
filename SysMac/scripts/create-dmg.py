@@ -6,16 +6,16 @@ import shutil
 from pathlib import Path
 
 def main():
-    # Paths
-    project_root = Path("/Users/me/Documents/MMAC/SysMac")
+    # Paths (relative to SysMac/ directory)
+    project_root = Path(__file__).resolve().parent.parent
     dist_dir = project_root / "dist"
     app_dir = dist_dir / "SysMac.app"
     contents_dir = app_dir / "Contents"
     macos_dir = contents_dir / "MacOS"
     resources_dir = contents_dir / "Resources"
-    
-    # Executable path
-    executable = project_root / ".build" / "arm64-apple-macosx" / "release" / "SysMac"
+
+    # Executable path (SwiftPM build output)
+    executable = project_root / ".build" / "release" / "SysMac"
     
     print("Creating DMG for SysMac...")
     

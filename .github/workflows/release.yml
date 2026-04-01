@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release DMG
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build release binary
+        run: cd SysMac && swift build -c release
+
+      - name: Create DMG
+        run: python3 SysMac/scripts/create-dmg.py
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          gh release create "$TAG" \
+            --title "SysMac ${TAG#v}" \
+            --notes "Release ${TAG#v}" \
+            SysMac/dist/SysMac-1.0.dmg
