@@ -51,7 +51,12 @@ enum OrphanedService {
                 let matchesInstalled = installedIds.contains(name) || installedNames.contains(where: { name.contains($0) })
                 if matchesInstalled { continue }
 
-                // Calculate size
+                // Cheap pre-check: skip directories whose total file size metadata is under 1MB
+                if let topValues = try? item.resourceValues(forKeys: [.totalFileSizeKey]),
+                   let topSize = topValues.totalFileSize, topSize < 1_048_576 {
+                    continue
+                }
+
                 let size = FileUtilities.directorySize(at: item)
                 guard size >= 1_048_576 else { continue } // 1MB minimum
 
